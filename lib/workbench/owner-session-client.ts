@@ -6,6 +6,7 @@ import {
   type OwnerStreamState,
   type ProHomeSessionItem,
 } from '@/lib/workbench/pro-home-data';
+import { apiPath } from '@/lib/base-path';
 
 // This is a closed set because EventSource dispatches named events only to
 // matching listeners; future server event names are structurally invisible
@@ -219,7 +220,9 @@ export class OwnerSessionClient {
 
   private openStream(): void {
     const epoch = this.epoch;
-    const source = this.options.createEventSource('/api/agent/owner-events', { headers: {} });
+    const source = this.options.createEventSource(apiPath('/api/agent/owner-events'), {
+      headers: {},
+    });
     this.source = source;
     this.connectingSamples = 0;
     if (this.streamHealthTimer) clearInterval(this.streamHealthTimer);

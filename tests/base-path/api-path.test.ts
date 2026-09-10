@@ -60,12 +60,36 @@ describe('apiPath', () => {
  */
 describe('no bare same-origin request paths', () => {
   const ROOTS = ['app', 'lib', 'components', 'hooks'];
-  const ALLOWED = new Set(['lib/base-path.ts']);
+  const ALLOWED = new Set([
+    'lib/base-path.ts',
+    // The pbl/v2 endpoint is a union of path literals typed at the declaration
+    // and consumed once, and wrapping each literal would retype the union. They
+    // are wrapped at that single call instead -- which no regex can see, so the
+    // exemption is paired with the assertion below that the wrap is still there.
+    'components/scene-renderers/pbl/v2/chat.tsx',
+    'components/scene-renderers/pbl/v2/use-instructor-stream.ts',
+  ]);
   // `fetch(` or `new EventSource(` followed by a string literal starting with
   // `/`, without apiPath() in between.
   // The backtick is written as an escape so this file never contains a
   // stray one: the pattern is read by tools that lex before they parse.
-  const BARE = /(?<![\w$.])(?:fetch|new EventSource)\(\s*['"\x60]\//gu;
+  // Three shapes, because `fetch(` was never the whole surface. The first
+  // pass matched only that one and reported a clean tree while the
+  // persistence layer was still addressing the origin root through a
+  // `baseUrl:`.
+  //
+  // What no static rule can catch is `fetch(someVariable)`. Where a URL
+  // travels as a variable it is wrapped at the call rather than at the
+  // declaration -- see use-instructor-stream.ts, whose endpoint is a union
+  // of literals that wrapping individually would retype.
+  const BARE = [
+    /(?<![\w$.])(?:fetch|new EventSource)\(\s*['"\x60]\//gu,
+    // Narrowed to /api/ deliberately: every route this app serves lives there,
+    // while `endpoint: '/v1/audio/speech'` is a path on a provider's base URL
+    // and prefixing it would send the request to this origin instead.
+    /(?:baseUrl|endpoint|url)\s*:\s*['"\x60]\/api\//gu,
+    /create(?:EventSource|Source)\(\s*['"\x60]\//gu,
+  ];
 
   /**
    * One recursive directory walk, and no `statSync` per entry.
@@ -97,21 +121,38 @@ describe('no bare same-origin request paths', () => {
         const rel = file.split(sep).join('/');
         if (ALLOWED.has(rel)) continue;
         const text = readFileSync(file, 'utf8');
-        for (const match of text.matchAll(BARE)) {
-          const line = text.slice(0, match.index).split('\n').length;
-          offenders.push(`${rel}:${line}`);
+        for (const pattern of BARE) {
+          for (const match of text.matchAll(pattern)) {
+            const line = text.slice(0, match.index).split('\n').length;
+            offenders.push(`${rel}:${line}`);
+          }
         }
       }
     }
     expect(offenders).toEqual([]);
   });
 
+  it('keeps the exempted union wrapped at its single point of use', () => {
+    // The exemption above is only safe while this holds. If the wrap is removed
+    // the eleven literals it covers go back to addressing the origin root, and
+    // nothing else in this file would notice.
+    const consumer = readFileSync(
+      join('components', 'scene-renderers', 'pbl', 'v2', 'use-instructor-stream.ts'),
+      'utf8',
+    );
+    expect(consumer).toContain('fetch(apiPath(endpoint)');
+  });
+
   it('would notice one that slipped back in', () => {
     // Proves the pattern above matches what it claims to, so an empty result
     // means "none found" rather than "the regex never matched anything".
-    const sample = "const res = await fetch('/api/stages', { method: 'GET' });";
-    expect([...sample.matchAll(BARE)]).toHaveLength(1);
-    expect([..."await fetch(apiPath('/api/stages'))".matchAll(BARE)]).toHaveLength(0);
-    expect([..."await prefetch('/api/x')".matchAll(BARE)]).toHaveLength(0);
+    const hits = (text: string) => BARE.flatMap((p) => [...text.matchAll(p)]).length;
+    expect(hits("const res = await fetch('/api/stages');")).toBe(1);
+    expect(hits("new HttpDocumentStore({ baseUrl: '/api/persistence' })")).toBe(1);
+    expect(hits("createEventSource('/api/agent/owner-events')")).toBe(1);
+    expect(hits("run({ endpoint: '/api/pbl/v2/simulator' })")).toBe(1);
+    expect(hits("await fetch(apiPath('/api/stages'))")).toBe(0);
+    expect(hits("baseUrl: apiPath('/api/persistence')")).toBe(0);
+    expect(hits("await prefetch('/api/x')")).toBe(0);
   });
 });

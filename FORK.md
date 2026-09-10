@@ -66,9 +66,25 @@ origin, so it is a request sent to another team's `/api`.
 - **`lib/base-path.ts`** (new) — `apiPath()`, idempotent because two layers can
   apply it, and empty by default so a root deployment pays nothing.
 - Every call site goes through it, and
-  **`tests/base-path/api-path.test.ts`** fails if one stops: 71 sites were
-  converted at once, and without something that fails they come back one at a
+  **`tests/base-path/api-path.test.ts`** fails if one stops: the sites were
+  converted in bulk, and without something that fails they come back one at a
   time.
+
+  The guard matches three shapes, because `fetch(` was never the whole surface.
+  The first version matched only that one and reported a clean tree while
+  `lib/persistence/bootstrap.ts` — the entire persistence layer — was still
+  addressing the origin root through a `baseUrl:`. It found that by being run,
+  not by being read. The three are a direct `fetch`/`EventSource` call, a URL
+  handed to something as configuration (`baseUrl:`, `endpoint:`, `url:`,
+  narrowed to `/api/` so a provider's own `/v1/...` path is not rewritten to
+  point here), and a URL handed to an injected factory (`createEventSource(`).
+
+  What no static rule can catch is `fetch(someVariable)`. Where a URL travels as
+  a variable it is wrapped at the call rather than at the declaration — the
+  pbl/v2 endpoint is a union of path literals that wrapping individually would
+  retype, so it is wrapped once at its single `fetch`. Those two files are
+  exempt from the scan, and the exemption is paired with an assertion that the
+  wrap is still there.
 - `NEXT_PUBLIC_STUDIO_BASE_PATH` is read by `next.config.ts` and by
   `apiPath()` — the two halves have to agree, and a mismatch is not a build
   error but a working page whose every request goes somewhere else. Being

@@ -8,6 +8,7 @@ import {
 } from '@/lib/document-store/config';
 import { assertRuntimeStorageConfigurable, configureRuntimeStorage } from '@/lib/runtime/config';
 import { getLearnerKey } from '@/lib/runtime/learner-key';
+import { apiPath } from '@/lib/base-path';
 
 let deviceKv: BrowserKVStore | undefined;
 let learnerKeyPromise: Promise<string> | undefined;
@@ -45,7 +46,7 @@ if (isBrowserPersistenceEnabled()) {
   const runtimeOptions = {
     store: () =>
       new HttpRuntimeStore({
-        baseUrl: '/api/persistence',
+        baseUrl: apiPath('/api/persistence'),
         headers: headers satisfies HttpRuntimeHeadersHook,
       }),
     learnerKey,
@@ -53,7 +54,7 @@ if (isBrowserPersistenceEnabled()) {
   const documentOptions: DocumentStorageOptions = {
     store: ({ validateScene, validateStage }) =>
       new HttpDocumentStore({
-        baseUrl: '/api/persistence',
+        baseUrl: apiPath('/api/persistence'),
         headers: headers satisfies HttpDocumentHeadersHook,
         validateScene,
         validateStage,

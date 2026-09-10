@@ -50,6 +50,7 @@ import { normalizeProjectRuntime } from '@/lib/pbl/v2/operations/kernel/progress
 import { getCurrentModelConfig } from '@/lib/utils/model-config';
 import { createLogger } from '@/lib/logger';
 import { applyInstructorEvent } from './apply-instructor-event';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('PBL v2 InstructorStream');
 
@@ -309,7 +310,10 @@ export async function runOneStream(args: OneStreamArgs): Promise<PBLProjectV2> {
     // localStorage unavailable; skip silently.
   }
 
-  const res = await fetch(endpoint, {
+  // `endpoint` is a union of literals declared above, so wrapping each of them
+  // would change the type. One wrap here covers all of them, and the guard
+  // cannot see this shape either way: the argument is an identifier.
+  const res = await fetch(apiPath(endpoint), {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
