@@ -43,12 +43,23 @@ function anonymousCookieHeader(id: string): string {
  * — the headers the caller returns to the client — is required: it receives
  * the outgoing Set-Cookie header whenever a new cookie is issued.
  *
- * Current callers (the agent event-stream routes) pass no authenticated
- * owner: for them this slice resolves only the anonymous cookie identity. A
- * future auth integration must thread `authenticatedOwnerId` through those
- * call sites, or sessions created under authenticated identities would be
- * unreachable by their own owner.
+ * Fork change: that auth integration exists. Every call site threads the
+ * identity DeepWitya's gateway verified, read by
+ * `lib/server/studio-identity.ts`, so the anonymous path below is now reached
+ * only by a deployment running without a gateway in front of it.
  */
+/**
+ * The anonymous owner id already carried by this request, or undefined.
+ *
+ * Mints nothing, which is what makes it safe to call from code that has no
+ * response to attach a Set-Cookie to. `resolveRequestOwnerId` is the caller
+ * that may mint; everyone else reads.
+ */
+export function readAnonymousOwnerId(headers: Headers): string | undefined {
+  const existingId = readCookie(headers, ANONYMOUS_COOKIE);
+  return existingId && UUID_V4.test(existingId) ? `anon:${existingId}` : undefined;
+}
+
 export function resolveRequestOwnerId(
   req: Pick<Request, 'headers'>,
   responseHeaders: Headers,
@@ -56,8 +67,8 @@ export function resolveRequestOwnerId(
 ): string {
   if (authenticatedOwnerId) return authenticatedOwnerId;
 
-  const existingId = readCookie(req.headers, ANONYMOUS_COOKIE);
-  if (existingId && UUID_V4.test(existingId)) return `anon:${existingId}`;
+  const existing = readAnonymousOwnerId(req.headers);
+  if (existing) return existing;
 
   const id = randomUUID();
   responseHeaders.append('Set-Cookie', anonymousCookieHeader(id));

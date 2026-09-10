@@ -43,11 +43,10 @@ export async function resolveServerAsset(
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return { status: 'unconfigured' };
 
-  // Shared-partition development auth: this authenticator maps every caller to
-  // one 'shared' asset principal (see the server-auth.ts docstring). It is the
-  // documented stopgap for this deployment shape — its cost surface is
-  // accepted until real per-learner principals land in a later part of the
-  // RFC; do not extend it here.
+  // The asset principal is the owner the gateway verified (see
+  // server-auth.ts). Upstream filed every asset under one 'shared' principal;
+  // here each owner has their own, so an asset id guessed or copied from
+  // somewhere else does not resolve for a different account.
   const principal = authenticatePersistenceHeaders(headers);
   // The authenticator always supplies a partition key on success, but its type
   // leaves it optional; a keyless principal fails closed as unauthenticated.

@@ -36,20 +36,33 @@ describe('embedded persistence route', () => {
     });
   });
 
-  it('refuses configured persistence when the development token is missing', async () => {
+  it('refuses a configured route when the gateway said nothing about the caller', async () => {
+    // Upstream answered 503 here, for a missing PERSISTENCE_DEV_TOKEN. That
+    // credential is gone; what a request with no identity gets now is a 401
+    // from the authenticator, and it must not reach the store on the way.
     vi.stubEnv('DATABASE_URL', 'postgres://unused-in-this-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', '');
+    vi.stubEnv('STUDIO_REQUIRE_GATEWAY', '1');
     const { GET } = await import('@/app/api/persistence/[...path]/route');
 
     const response = await GET(new Request('http://localhost/api/persistence/documents'));
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: {
-        code: 'PERSISTENCE_DEV_TOKEN_MISSING',
-        message: 'server persistence requires PERSISTENCE_DEV_TOKEN (development auth only)',
-      },
-    });
+    // 401, and the connection string is deliberately unusable: reaching the
+    // pool would surface as a 500 instead, which is how this asserts that the
+    // refusal happens before the database is touched.
+    expect(response.status).toBe(401);
+  });
+
+  it('still serves an anonymous visitor when no gateway is required', async () => {
+    // Upstream's shape, kept runnable: with STUDIO_REQUIRE_GATEWAY unset the
+    // route falls through to the anonymous cookie identity, so this fork can
+    // still be started the way upstream is. Our deployment sets the variable —
+    // the compose contract check asserts it — so this path is never live there.
+    vi.stubEnv('DATABASE_URL', 'postgres://unused-in-this-test');
+    const { GET } = await import('@/app/api/persistence/[...path]/route');
+
+    const response = await GET(new Request('http://localhost/api/persistence/documents'));
+
+    expect(response.status).not.toBe(401);
   });
 
   it('retries initialization on the next request after a failed pool initialization', async () => {
@@ -92,11 +105,10 @@ describe('embedded persistence route', () => {
       ),
     }));
     vi.stubEnv('DATABASE_URL', 'postgres://retry-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     const { handlePersistenceRequest } = await import('@/app/api/persistence/[...path]/route');
     const request = () =>
       new Request('http://localhost/api/persistence/runtime/sessions', {
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       });
 
     const first = await handlePersistenceRequest(request(), {
@@ -194,13 +206,12 @@ describe('embedded persistence route', () => {
       throw new Error('the optional SDK must not resolve without a bucket');
     });
     vi.stubEnv('DATABASE_URL', 'postgres://asset-wiring-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     const { handlePersistenceRequest } = await import('@/app/api/persistence/[...path]/route');
     const pool = { end: vi.fn().mockResolvedValue(undefined) };
 
     const response = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/assets/ast_example/content', {
-        headers: { authorization: 'Bearer test-token', 'x-learner-key': 'anon:test' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => pool as never },
     );
@@ -294,14 +305,13 @@ describe('embedded persistence route', () => {
       return { loadS3AssetByteStore };
     });
     vi.stubEnv('DATABASE_URL', 'postgres://asset-s3-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     vi.stubEnv('ASSET_S3_BUCKET', '  asset-bucket  ');
     const { handlePersistenceRequest } = await import('@/app/api/persistence/[...path]/route');
 
     const response = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/assets', {
         method: 'POST',
-        headers: { authorization: 'Bearer test-token', 'x-learner-key': 'anon:test' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => ({ end: vi.fn().mockResolvedValue(undefined) }) as never },
     );
@@ -368,7 +378,6 @@ describe('embedded persistence route', () => {
       return { loadS3AssetByteStore: vi.fn() };
     });
     vi.stubEnv('DATABASE_URL', 'postgres://invalid-s3-bucket-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     vi.stubEnv('ASSET_S3_BUCKET', 'Invalid_Bucket');
     const { handlePersistenceRequest } = await import('@/app/api/persistence/[...path]/route');
     const poolFactory = vi.fn(() => ({ end: vi.fn().mockResolvedValue(undefined) }));
@@ -377,7 +386,7 @@ describe('embedded persistence route', () => {
     // and runtime traffic initializes and serves normally.
     const response = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/runtime/sessions', {
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: poolFactory as never },
     );
@@ -439,13 +448,12 @@ describe('embedded persistence route', () => {
     }));
     vi.doMock('@openmaic/storage/asset/s3-bytes', () => ({ loadS3AssetByteStore }));
     vi.stubEnv('DATABASE_URL', 'postgres://asset-s3-retry-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     vi.stubEnv('ASSET_S3_BUCKET', 'asset-bucket');
     const { handlePersistenceRequest } = await import('@/app/api/persistence/[...path]/route');
 
     const response = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/runtime/sessions', {
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => ({ end: vi.fn().mockResolvedValue(undefined) }) as never },
     );
@@ -503,14 +511,13 @@ describe('embedded persistence route', () => {
       }),
     }));
     vi.stubEnv('DATABASE_URL', 'postgres://validator-wiring-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     const [{ handlePersistenceRequest }, { APP_RUNTIME_PAYLOAD_VALIDATORS }] = await Promise.all([
       import('@/app/api/persistence/[...path]/route'),
       import('@/lib/runtime/payload-validators'),
     ]);
     const response = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/runtime/sessions', {
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => ({ end: vi.fn() }) as never },
     );
@@ -579,14 +586,13 @@ describe('embedded persistence route', () => {
       ),
     }));
     vi.stubEnv('DATABASE_URL', 'postgres://adapter-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     const { handlePersistenceRequest } = await import('@/app/api/persistence/[...path]/route');
     const pool = { end: vi.fn().mockResolvedValue(undefined) };
 
     const put = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/documents/stage%2Fslash', {
         method: 'PUT',
-        headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+        headers: { 'x-deeptutor-owner': 'user:test', 'content-type': 'application/json' },
         body: JSON.stringify({ hello: 'world' }),
       }),
       { poolFactory: () => pool as never },
@@ -599,7 +605,7 @@ describe('embedded persistence route', () => {
     const del = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/documents/stage%2Fslash', {
         method: 'DELETE',
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => pool as never },
     );
@@ -632,7 +638,6 @@ describe('embedded persistence route', () => {
       createStorageHttpHandler: vi.fn(() => handler),
     }));
     vi.stubEnv('DATABASE_URL', connectionString);
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
   };
 
   const readAdapterBody = async (path: string) => {
@@ -640,7 +645,7 @@ describe('embedded persistence route', () => {
     const pool = { end: vi.fn().mockResolvedValue(undefined) };
     const response = await handlePersistenceRequest(
       new Request(`http://localhost/api/persistence/${path}`, {
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => pool as never },
     );
@@ -789,7 +794,7 @@ describe('embedded persistence route', () => {
     const response = await handlePersistenceRequest(
       new Request('http://localhost/api/persistence/documents/head', {
         method: 'HEAD',
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => ({ end: vi.fn() }) as never },
     );
@@ -835,14 +840,13 @@ describe('embedded persistence route', () => {
       DEFAULT_SIGNED_URL_TTL_SECONDS: 60,
     }));
     vi.stubEnv('DATABASE_URL', connectionString);
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
   };
 
   const requestThroughRoute = async () => {
     const { handlePersistenceRequest } = await import('@/app/api/persistence/[...path]/route');
     return handlePersistenceRequest(
       new Request('http://localhost/api/persistence/runtime/sessions', {
-        headers: { authorization: 'Bearer test-token' },
+        headers: { 'x-deeptutor-owner': 'user:test' },
       }),
       { poolFactory: () => ({ end: vi.fn().mockResolvedValue(undefined) }) as never },
     );
@@ -1003,7 +1007,6 @@ describe('embedded persistence route', () => {
       loadS3AssetByteStore: vi.fn().mockResolvedValue({ signReadUrl }),
     }));
     vi.stubEnv('DATABASE_URL', 'postgres://egress-signing-forward-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
     vi.stubEnv('ASSET_S3_BUCKET', 'asset-bucket');
 
     const response = await requestThroughRoute();
@@ -1065,7 +1068,6 @@ describe('embedded persistence route', () => {
       ),
     }));
     vi.stubEnv('DATABASE_URL', 'postgres://egress-signing-decline-test');
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
 
     const response = await requestThroughRoute();
     expect(response.status).toBe(204);
@@ -1168,12 +1170,11 @@ describe('embedded persistence route -- real handler boundary', () => {
       nodePostgresTransaction: vi.fn(() => vi.fn()),
     }));
     vi.stubEnv('DATABASE_URL', connectionString);
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token');
   }
 
   const authed = (path: string, extraHeaders: Record<string, string> = {}) =>
     new Request(`http://localhost/api/persistence${path}`, {
-      headers: { authorization: 'Bearer test-token', ...extraHeaders },
+      headers: { 'x-deeptutor-owner': 'user:test', ...extraHeaders },
     });
 
   it('serves a stored asset through the real handler and route adapter', async () => {
@@ -1190,9 +1191,10 @@ describe('embedded persistence route -- real handler boundary', () => {
     const store = stores[0]!;
     const id = await store.put(
       {
-        // The dev authenticator issues one shared asset principal for every
-        // request, so the stored entry must live under it to be readable.
-        key: 'shared',
+        // The asset principal is the owner the gateway verified, so the
+        // stored entry must live under the same owner the request states to
+        // be readable at all.
+        key: 'user:test',
       },
       new Blob(['real-bytes'], { type: 'text/plain' }),
       {
@@ -1228,9 +1230,10 @@ describe('embedded persistence route -- real handler boundary', () => {
     expect(first.status).not.toBe(500);
     const id = await stores[0]!.put(
       {
-        // The dev authenticator issues one shared asset principal for every
-        // request, so the stored entry must live under it to be readable.
-        key: 'shared',
+        // The asset principal is the owner the gateway verified, so the
+        // stored entry must live under the same owner the request states to
+        // be readable at all.
+        key: 'user:test',
       },
       new Blob(['real-bytes'], { type: 'text/plain' }),
       { contentType: 'image/png' },

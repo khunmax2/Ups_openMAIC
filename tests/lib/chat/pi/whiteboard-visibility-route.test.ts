@@ -3,12 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryWhiteboardVisibility } from '@/lib/chat/pi/whiteboard-visibility';
 
+// The learner partition is the owner the gateway verified, so the header the
+// route reads and the key the pending query waits on are one value.
+const OWNER = 'user:learner-1';
+
 function request(
   body: unknown,
-  headers: Record<string, string> = {
-    authorization: 'Bearer test-token',
-    'x-learner-key': 'learner-1',
-  },
+  headers: Record<string, string> = { 'x-deeptutor-owner': OWNER },
 ): NextRequest {
   return new Request('http://localhost/api/chat/pi/whiteboard-visibility', {
     method: 'POST',
@@ -18,14 +19,13 @@ function request(
 }
 
 describe('whiteboard visibility callback route', () => {
-  beforeEach(() => vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'test-token'));
   afterEach(() => vi.unstubAllEnvs());
 
   it('does not let malformed, unauthenticated, or mismatched callbacks settle the owner', async () => {
     let queryId = '';
     const pending = queryWhiteboardVisibility({
       stageId: 'stage-1',
-      learnerKey: 'learner-1',
+      learnerKey: OWNER,
       timeoutMs: 1_000,
       dispatch: async (id) => {
         queryId = id;
@@ -39,7 +39,7 @@ describe('whiteboard visibility callback route', () => {
         await POST(
           request(
             { queryId, stageId: 'stage-1', visibility: 'closed' },
-            { authorization: 'Bearer wrong', 'x-learner-key': 'learner-1' },
+            { 'x-deeptutor-owner': 'anon:not-a-verified-user' },
           ),
         )
       ).status,

@@ -22,16 +22,17 @@ const RESOLVED_MIME = 'text/plain';
 const RESOLVED_BYTE_LENGTH = RESOLVED_BYTES.length;
 const SIZE_CAP = 1024 * 1024;
 
-function authHeaders(token?: string): Headers {
+const OWNER = 'user:alice';
+
+function authHeaders(owner?: string): Headers {
   const headers = new Headers();
-  if (token) headers.set('authorization', `Bearer ${token}`);
+  if (owner) headers.set('x-deeptutor-owner', owner);
   return headers;
 }
 
 describe('resolveServerAsset', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
-    vi.stubEnv('PERSISTENCE_DEV_TOKEN', 'shared-secret');
     vi.stubEnv('DATABASE_URL', 'postgres://test');
     mocks.getServerPersistenceProvider.mockReset();
     mocks.assetStoreIdentify.mockReset();
@@ -49,10 +50,10 @@ describe('resolveServerAsset', () => {
     });
   });
 
-  it('derives the shared principal from a valid bearer token and resolves the asset', async () => {
+  it('addresses the store with the verified owner and resolves the asset', async () => {
     mocks.assetStoreResolve.mockResolvedValue({ bytes: RESOLVED_BYTES, mime: RESOLVED_MIME });
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'), SIZE_CAP);
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER), SIZE_CAP);
 
     expect(resolution).toEqual({
       status: 'resolved',
@@ -60,11 +61,13 @@ describe('resolveServerAsset', () => {
       mimeType: RESOLVED_MIME,
     });
     expect(mocks.getServerPersistenceProvider).toHaveBeenCalledWith('postgres://test');
-    // The development authenticator maps every caller to the single shared
-    // asset partition (see server-auth.ts), so the store is addressed by the
-    // shared principal, not by any per-header partition.
-    expect(mocks.assetStoreIdentify).toHaveBeenCalledWith({ key: 'shared' }, toAssetId(ASSET_ID));
-    expect(mocks.assetStoreResolve).toHaveBeenCalledWith({ key: 'shared' }, toAssetId(ASSET_ID));
+    // Fork change: the asset partition is the owner the gateway verified, not
+    // the single 'shared' principal upstream filed every asset under. This is
+    // the assertion that would have caught an isolation fix that stopped at
+    // documents.
+    const principal = { key: OWNER, learnerKey: OWNER };
+    expect(mocks.assetStoreIdentify).toHaveBeenCalledWith(principal, toAssetId(ASSET_ID));
+    expect(mocks.assetStoreResolve).toHaveBeenCalledWith(principal, toAssetId(ASSET_ID));
   });
 
   it('answers too_large from the recorded length WITHOUT resolving the bytes', async () => {
@@ -74,7 +77,7 @@ describe('resolveServerAsset', () => {
       byteLength: 2 * SIZE_CAP,
     });
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'), SIZE_CAP);
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER), SIZE_CAP);
 
     expect(resolution).toEqual({ status: 'too_large' });
     expect(mocks.assetStoreIdentify).toHaveBeenCalledTimes(1);
@@ -90,7 +93,7 @@ describe('resolveServerAsset', () => {
     });
     mocks.assetStoreResolve.mockResolvedValue({ bytes: RESOLVED_BYTES, mime: RESOLVED_MIME });
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'), SIZE_CAP);
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER), SIZE_CAP);
 
     expect(resolution).toEqual({
       status: 'resolved',
@@ -104,31 +107,48 @@ describe('resolveServerAsset', () => {
   it('does not consult the store at all when no cap is supplied', async () => {
     mocks.assetStoreResolve.mockResolvedValue({ bytes: RESOLVED_BYTES, mime: RESOLVED_MIME });
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'));
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER));
 
     expect(resolution.status).toBe('resolved');
     expect(mocks.assetStoreIdentify).not.toHaveBeenCalled();
     expect(mocks.assetStoreResolve).toHaveBeenCalledTimes(1);
   });
 
-  it('reports unauthenticated when the bearer token is missing', async () => {
+  it('reports unauthenticated when the gateway said nothing about the caller', async () => {
     const resolution = await resolveServerAsset(ASSET_ID, authHeaders());
 
     expect(resolution).toEqual({ status: 'unauthenticated' });
     expect(mocks.assetStoreResolve).not.toHaveBeenCalled();
   });
 
-  it('reports unauthenticated when the bearer token is wrong', async () => {
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('wrong-token'));
+  it('reports unauthenticated for an identity that is not a verified user', async () => {
+    // `anon:` is the prefix upstream mints for a cookie-only visitor. Reaching
+    // an asset with one would mean the store was addressed by something that
+    // was never verified.
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('anon:0195c8c2'));
 
     expect(resolution).toEqual({ status: 'unauthenticated' });
     expect(mocks.assetStoreResolve).not.toHaveBeenCalled();
   });
 
+  it('does not reach an asset belonging to another owner', async () => {
+    // The whole point, asserted at the store boundary: the same asset id read
+    // by two accounts addresses two different partitions, so one cannot serve
+    // the other's bytes.
+    mocks.assetStoreResolve.mockResolvedValue({ bytes: RESOLVED_BYTES, mime: RESOLVED_MIME });
+
+    await resolveServerAsset(ASSET_ID, authHeaders('user:alice'));
+    await resolveServerAsset(ASSET_ID, authHeaders('user:bob'));
+
+    const [first, second] = mocks.assetStoreResolve.mock.calls;
+    expect(first[0]).not.toEqual(second[0]);
+    expect(first[1]).toEqual(second[1]);
+  });
+
   it('reports unconfigured when DATABASE_URL is absent', async () => {
     vi.stubEnv('DATABASE_URL', '');
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'));
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER));
 
     expect(resolution).toEqual({ status: 'unconfigured' });
     expect(mocks.getServerPersistenceProvider).not.toHaveBeenCalled();
@@ -137,7 +157,7 @@ describe('resolveServerAsset', () => {
   it('reports missing when the store resolves no entry for the id', async () => {
     mocks.assetStoreResolve.mockResolvedValue(undefined);
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'), SIZE_CAP);
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER), SIZE_CAP);
 
     expect(resolution).toEqual({ status: 'missing' });
   });
@@ -145,7 +165,7 @@ describe('resolveServerAsset', () => {
   it('reports missing when the identity read finds no entry (resolve never called)', async () => {
     mocks.assetStoreIdentify.mockResolvedValue(null);
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'), SIZE_CAP);
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER), SIZE_CAP);
 
     expect(resolution).toEqual({ status: 'missing' });
     expect(mocks.assetStoreIdentify).toHaveBeenCalledTimes(1);
@@ -155,7 +175,7 @@ describe('resolveServerAsset', () => {
   it('reports missing when the store raises AssetNotFoundError', async () => {
     mocks.assetStoreResolve.mockRejectedValue(new AssetNotFoundError());
 
-    const resolution = await resolveServerAsset(ASSET_ID, authHeaders('shared-secret'));
+    const resolution = await resolveServerAsset(ASSET_ID, authHeaders(OWNER));
 
     expect(resolution).toEqual({ status: 'missing' });
   });
@@ -164,6 +184,6 @@ describe('resolveServerAsset', () => {
     const failure = new Error('db connection refused');
     mocks.assetStoreResolve.mockRejectedValue(failure);
 
-    await expect(resolveServerAsset(ASSET_ID, authHeaders('shared-secret'))).rejects.toBe(failure);
+    await expect(resolveServerAsset(ASSET_ID, authHeaders(OWNER))).rejects.toBe(failure);
   });
 });
