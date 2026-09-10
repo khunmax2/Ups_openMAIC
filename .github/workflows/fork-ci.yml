@@ -1,0 +1,68 @@
+# CI for this fork's own branches.
+#
+# Upstream's ci.yml is tuned to upstream's branch names: its `push` list names
+# their integration branches, and its `pull_request` list names their feature
+# branches. Ours are called feat/… and fix/…, so a push here matches nothing and
+# only a pull request into main matches at all. The result was a fork whose CI
+# had never run once — every change merged on local measurement, which was
+# stated each time but is not the same thing.
+#
+# This runs on every branch and every pull request, and does what was being done
+# by hand: install, typecheck, lint, and the suites that cover the fork's own
+# work. It deliberately does NOT run upstream's full matrix — that is ci.yml's
+# job, and duplicating it would make this slow enough to be skipped.
+name: Fork CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: fork-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # postinstall builds the five @openmaic packages, and the app does not
+      # typecheck without them.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint the files this fork owns
+        run: |
+          npx eslint \
+            lib/base-path.ts \
+            lib/server/studio-identity.ts \
+            lib/persistence/server-auth.ts \
+            lib/server/agent-runtime/owner.ts \
+            lib/server/agent-runtime/with-owner.ts \
+            lib/workbench/workspace-actions.ts \
+            tests/base-path \
+            tests/agent-runtime/studio-identity.test.ts
+
+      # The three suites that cover what this fork changed: the identity seam,
+      # the persistence route and its auth, and the base-path guard -- which is
+      # the one that fails if a converted call site comes back.
+      - name: Test
+        run: >
+          npx vitest run
+          tests/base-path
+          tests/persistence
+          tests/agent-runtime/studio-identity.test.ts
