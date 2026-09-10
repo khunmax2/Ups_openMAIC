@@ -88,6 +88,16 @@ FROM node:22-alpine AS runner
 
 ARG ALPINE_MIRROR=""
 
+# Fork addition, and it has to be here as well as in the builder. Next inlines
+# NEXT_PUBLIC_* into the BROWSER bundle at build; server code still reads
+# process.env at run time. This variable is read by both halves -- next.config's
+# `basePath` and the client's apiPath() at build, and the persistence route's
+# prefix arithmetic at run time -- so a builder-only value leaves the server
+# thinking it is mounted at the origin root. The symptom is every persistence
+# path answering ROUTE_NOT_FOUND while the pages themselves serve correctly.
+ARG NEXT_PUBLIC_STUDIO_BASE_PATH
+ENV NEXT_PUBLIC_STUDIO_BASE_PATH=$NEXT_PUBLIC_STUDIO_BASE_PATH
+
 WORKDIR /app
 
 ENV NODE_ENV=production
