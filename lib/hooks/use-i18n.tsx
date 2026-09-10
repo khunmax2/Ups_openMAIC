@@ -7,6 +7,20 @@ import '@/lib/i18n/config';
 
 const LOCALE_STORAGE_KEY = 'locale';
 
+/**
+ * Query parameter a host can use to choose the language, e.g. `?lang=th`.
+ *
+ * Exists for embedded deployments: an app framing this one in an iframe has no
+ * other way to hand it a language. A same-origin host could write the storage
+ * key directly, but that only works when both sides share an origin — which is
+ * precisely the arrangement an embedder should not be forced into.
+ *
+ * The value goes through `resolveLocale`, so a host may pass a loose code
+ * (`th`, `pt`) without knowing the exact locale identifier, and anything
+ * unrecognised falls back rather than erroring.
+ */
+const LOCALE_QUERY_PARAM = 'lang';
+
 /** Match a browser language code (e.g. 'en', 'zh-TW') to a supported locale */
 function resolveLocale(lang: string): Locale {
   // Exact match
@@ -35,13 +49,27 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   // i18next handles fallback automatically: if the detected language
   // has no matching JSON file, it falls back to fallbackLng.
   useEffect(() => {
+    // Read the query first and outside the try: `location.search` cannot throw,
+    // and a blocked localStorage must not cost the host its choice of language.
+    const fromQuery = new URLSearchParams(window.location.search).get(LOCALE_QUERY_PARAM);
+    let stored: string | null = null;
     try {
-      const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
-      const raw = stored || navigator.language || defaultLocale;
-      const target = resolveLocale(raw);
-      if (target !== i18n.language) i18n.changeLanguage(target);
+      stored = localStorage.getItem(LOCALE_STORAGE_KEY);
     } catch {
-      // localStorage unavailable, keep default
+      // localStorage unavailable; the query and the browser language still apply.
+    }
+
+    const target = resolveLocale(fromQuery || stored || navigator.language || defaultLocale);
+    if (target !== i18n.language) i18n.changeLanguage(target);
+
+    // Persist a host-supplied language so it survives in-app navigation, which
+    // does not carry the query along.
+    if (fromQuery) {
+      try {
+        localStorage.setItem(LOCALE_STORAGE_KEY, target);
+      } catch {
+        // Storage is optional here — the language is already applied.
+      }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

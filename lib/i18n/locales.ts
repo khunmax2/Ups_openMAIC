@@ -23,6 +23,7 @@ export const supportedLocales = [
   { code: 'pt-BR', label: 'Português (Brasil)', shortLabel: 'BR' },
   { code: 'ko-KR', label: '한국어', shortLabel: 'KO' },
   { code: 'es-MX', label: 'Español (México)', shortLabel: 'ES' },
+  { code: 'th-TH', label: 'ไทย', shortLabel: 'TH' },
   { code: 'fr-FR', label: 'Français', shortLabel: 'FR' },
   { code: 'vi-VN', label: 'Tiếng Việt', shortLabel: 'VI' },
   { code: 'de-DE', label: 'Deutsch', shortLabel: 'DE' },
