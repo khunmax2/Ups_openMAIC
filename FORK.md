@@ -91,6 +91,32 @@ origin, so it is a request sent to another team's `/api`.
   `NEXT_PUBLIC_` also makes it a **build argument**: changing it means
   rebuilding the image, not restarting the container.
 
+### Media references carry the base path, and that has a cost
+
+`generate-image.ts`, `generate-video.ts` and `classroom-media-bytes.ts` write a
+`/api/classroom-media/...` reference into the scene document, which the browser
+later requests as a `src`. `lib/server/media-origin.ts` calls those references
+origin-independent, and they are — but a base path is not an origin, and a bare
+`/api/...` resolves against the root, which on a shared host is another team's
+API rather than a 404.
+
+The prefix goes on at **write** time. The renderer lives in
+`@openmaic/renderer`, published on its own, and teaching it about this app's
+base path would point the wrong way; there is no single seam in the app between
+the document and that package.
+
+**The cost, stated plainly:** a stored reference now carries the deployment's
+base path. Change the base path — the `/deepwitya2` → `/deepwitya` cutover is a
+known one — and stored rows point at the old path. That is one `UPDATE` over the
+scene documents, and it belongs in the deploy runbook. It is free while the
+database is empty, which is why the decision was taken now rather than after
+launch.
+
+The predicate that decides "did we generate this, or is it the learner's own
+pick" accepts **both** shapes for the same reason. Failing to recognise the
+older one would not 404; it would silently start treating our own past output as
+something to preserve, and generation would stop replacing it.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,
