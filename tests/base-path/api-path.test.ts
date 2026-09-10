@@ -93,7 +93,7 @@ describe('no bare same-origin request paths', () => {
     // public/ under the base path, but does not rewrite a src the app writes,
     // so a bare one asks the origin root -- 126 requests for /logos/*.svg
     // answered 404 on the first run, and a broken image reports nothing.
-    /<(?:img|Image)\b[^>]{0,200}?\bsrc=['"]\//gu,
+    /<(?:img|Image|motion\.img)\b[^>]{0,200}?\bsrc=['"]\//gu,
   ];
 
   /**
@@ -160,6 +160,10 @@ describe('no bare same-origin request paths', () => {
     expect(hits("baseUrl: apiPath('/api/persistence')")).toBe(0);
     expect(hits("await prefetch('/api/x')")).toBe(0);
     expect(hits('<img src="/logo-horizontal.png" alt="" />')).toBe(1);
+    // framer-motion's element is a different tag name and slipped the first
+    // version of this pattern -- it was the hero logo, the most visible image
+    // in the product.
+    expect(hits('<motion.img src="/logo-horizontal.png" alt="" />')).toBe(1);
     expect(hits('<img src={assetPath(brand.logoSrc)} alt="" />')).toBe(0);
   });
 });

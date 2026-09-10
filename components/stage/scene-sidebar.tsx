@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { useBrand } from '@/lib/brand/brand-context';
 import { useRouter } from 'next/navigation';
 import {
   PanelLeftClose,
@@ -42,6 +43,7 @@ export function SceneSidebar({
   onRetryOutline,
   isCourseComplete,
 }: SceneSidebarProps) {
+  const brand = useBrand();
   const { t } = useI18n();
   const router = useRouter();
   const { scenes, currentSceneId, setCurrentSceneId, generatingOutlines, generationStatus } =
@@ -132,7 +134,7 @@ export function SceneSidebar({
             className="flex items-center gap-2 cursor-pointer rounded-lg px-1.5 -mx-1.5 py-1 -my-1 hover:bg-gray-100/80 dark:hover:bg-gray-800/60 active:scale-[0.97] transition-all duration-150"
             title={t('generation.backToHome')}
           >
-            <img src={assetPath('/logo-horizontal.png')} alt="OpenMAIC" className="h-6" />
+            <img src={assetPath(brand.logoSrc)} alt={brand.productName} className="h-6" />
           </button>
           <button
             onClick={() => onCollapseChange(true)}
