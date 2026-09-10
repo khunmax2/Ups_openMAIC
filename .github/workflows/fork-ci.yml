@@ -28,9 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      # v5, and no `version:`. package.json carries
+      # `packageManager: pnpm@10.28.0+sha512…`, and the action refuses when a
+      # version is given as well as declared there. Upstream's ci.yml pins v5
+      # for the same reason; matching it means one pnpm to reason about.
+      - uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v4
         with:
