@@ -12,6 +12,7 @@ import { generateTTS, QwenTTSError, TTSRateLimitError } from '@/lib/audio/tts-pr
 import { TTS_PROVIDERS } from '@/lib/audio/constants';
 import { recordGenerationUsage } from '@/lib/server/usage-storage';
 import {
+  resolveTTSVoice,
   isServerConfiguredProvider,
   isServerTTSProviderDisabled,
   resolveTTSApiKey,
@@ -53,6 +54,13 @@ export async function POST(req: NextRequest) {
     audioId = body.audioId;
 
     // Validate required fields
+    // The server has the last word on the voice, the way it already does on the
+    // model and the base URL: an operator pointing this provider at their own
+    // engine declares which voices it serves, and the client's default is not
+    // one of them. Resolved before the guard below so a declared voice can also
+    // stand in for a client that sent none.
+    ttsVoice = resolveTTSVoice(ttsProviderId ?? '', ttsVoice);
+
     if (!text || !audioId || !ttsProviderId || !ttsVoice) {
       return apiError(
         'MISSING_REQUIRED_FIELD',
