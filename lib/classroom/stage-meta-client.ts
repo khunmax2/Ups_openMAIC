@@ -1,3 +1,4 @@
+import { apiPath } from '@/lib/base-path';
 /**
  * Client for `GET /api/stage-meta/:stageId` — the per-viewer facts a document
  * does not carry (the reference's `stage-meta-client.ts`, ported onto this
@@ -39,7 +40,7 @@ export async function fetchStageMeta(
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<StageMetaResult> {
   try {
-    const response = await fetchImpl(`/api/stage-meta/${encodeURIComponent(stageId)}`, {
+    const response = await fetchImpl(apiPath(`/api/stage-meta/${encodeURIComponent(stageId)}`), {
       credentials: 'include',
       cache: 'no-store',
     });
