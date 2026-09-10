@@ -39,6 +39,7 @@ import {
   VIDEO_RESOLUTIONS,
   type VideoResolution,
 } from '@/lib/video-export-app/export-options';
+import { apiPath } from '@/lib/base-path';
 
 const RESOLUTIONS = Object.keys(VIDEO_RESOLUTIONS) as VideoResolution[];
 
@@ -111,7 +112,7 @@ export function VideoExportDialog({
   useEffect(() => {
     if (!open) return;
     let active = true;
-    fetch('/api/export-video/capability')
+    fetch(apiPath('/api/export-video/capability'))
       .then((r) => r.json())
       .then((d: { enabled?: boolean }) => {
         if (active) setServiceEnabled(Boolean(d.enabled));

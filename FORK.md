@@ -52,6 +52,29 @@ integration.
 Upstream's anonymous path is kept intact and is what runs when the variable is
 unset, so this fork still starts the way upstream starts.
 
+### The app can be served under a path
+
+The deployment host serves seven applications under one origin and opens no
+port but 443, so the studio lives at `/course-studio`. Next's `basePath`
+handles the URLs **Next** generates; it does not touch a URL the application
+writes itself, and this codebase writes 71 of them (69 `fetch`, 2
+`EventSource`).
+
+On a shared host that is not a 404. `fetch('/api/stages')` resolves against the
+origin, so it is a request sent to another team's `/api`.
+
+- **`lib/base-path.ts`** (new) — `apiPath()`, idempotent because two layers can
+  apply it, and empty by default so a root deployment pays nothing.
+- Every call site goes through it, and
+  **`tests/base-path/api-path.test.ts`** fails if one stops: 71 sites were
+  converted at once, and without something that fails they come back one at a
+  time.
+- `NEXT_PUBLIC_STUDIO_BASE_PATH` is read by `next.config.ts` and by
+  `apiPath()` — the two halves have to agree, and a mismatch is not a build
+  error but a working page whose every request goes somewhere else. Being
+  `NEXT_PUBLIC_` also makes it a **build argument**: changing it means
+  rebuilding the image, not restarting the container.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,
@@ -59,8 +82,13 @@ because every rebase carries the DDL-drift risk: OpenMAIC ships no versioned
 migrations and guards every DDL statement with `IF NOT EXISTS`, so a drifted
 column type is accepted silently. `pg_dump` before every rebase.
 
-The three files most likely to conflict are the ones this fork edits inside
+The files most likely to conflict are the ones this fork edits inside
 upstream's own code: `lib/server/agent-runtime/owner.ts`,
 `lib/server/agent-runtime/with-owner.ts`, and
 `app/api/persistence/[...path]/route.ts`. Everything else is either a new file
-or a one-line thread-through.
+or a one-line change.
+
+The `apiPath()` conversion touches 41 files but only ever wraps an existing
+argument, so a conflict there resolves by re-wrapping — and any new `fetch` an
+upstream release adds will be caught by the guard test rather than found in
+production.

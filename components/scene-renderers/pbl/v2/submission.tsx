@@ -85,6 +85,7 @@ import {
   isToleratedReactionStreamError,
   type StreamStatus,
 } from './use-instructor-stream';
+import { apiPath } from '@/lib/base-path';
 
 interface Props {
   readonly project: PBLProjectV2;
@@ -1048,7 +1049,11 @@ function SubmissionModal({
       try {
         const fd = new FormData();
         fd.append('pdf', file);
-        const res = await fetch('/api/parse-pdf', { method: 'POST', body: fd, signal: ac.signal });
+        const res = await fetch(apiPath('/api/parse-pdf'), {
+          method: 'POST',
+          body: fd,
+          signal: ac.signal,
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (ac.signal.aborted) return;

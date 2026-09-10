@@ -41,6 +41,7 @@ import {
 } from '@/lib/store/settings-validation';
 import { createKVPersistStorage, purgeLegacyPersistKey } from '@/lib/store/kv-persist';
 import { isTTSProviderEnabled } from '@/lib/audio/provider-enablement';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('Settings');
 
@@ -1460,7 +1461,7 @@ export const useSettingsStore = create<SettingsState>()(
         // Fetch server-configured providers and merge into local state
         fetchServerProviders: async () => {
           try {
-            const res = await fetch('/api/server-providers');
+            const res = await fetch(apiPath('/api/server-providers'));
             if (!res.ok) return;
             // Managed providers expose only their allowed model list (LLM/image)
             // and presence (the "managed" flag) — never a base URL. Every

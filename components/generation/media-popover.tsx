@@ -34,6 +34,7 @@ import type { ImageProviderId, VideoProviderId } from '@/lib/media/types';
 import type { ASRProviderId } from '@/lib/audio/types';
 import { isCustomASRProvider } from '@/lib/audio/types';
 import type { SettingsSection } from '@/lib/types/settings';
+import { apiPath } from '@/lib/base-path';
 
 interface MediaPopoverProps {
   onSettingsOpen: (section: SettingsSection) => void;
@@ -110,7 +111,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
 
   const [comfyWorkflows, setComfyWorkflows] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
-    fetch('/api/comfyui-workflows')
+    fetch(apiPath('/api/comfyui-workflows'))
       .then((r) => r.json())
       .then((d) => setComfyWorkflows(d.workflows || []))
       .catch(() => setComfyWorkflows([]));

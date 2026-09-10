@@ -3,6 +3,7 @@ import { ASR_PROVIDERS } from '@/lib/audio/constants';
 import { getASRServerDisabledError } from '@/lib/audio/asr-enablement';
 import { normalizeASRUploadAudio } from '@/lib/audio/wav-utils';
 import { createLogger } from '@/lib/logger';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('AudioRecorder');
 
@@ -70,7 +71,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
           formData.append('audio', audioBlob, 'recording.webm');
         }
 
-        const response = await fetch('/api/transcription', {
+        const response = await fetch(apiPath('/api/transcription'), {
           method: 'POST',
           body: formData,
         });

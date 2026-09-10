@@ -1,6 +1,21 @@
 import type { NextConfig } from 'next';
 
+/**
+ * The path this deployment is served under, or undefined for the root.
+ *
+ * Read here and by `lib/base-path.ts` from the same variable, because the two
+ * halves have to agree: Next prefixes the URLs it generates, and `apiPath()`
+ * prefixes the ones the application writes. A mismatch is not a build error —
+ * it is a working page whose every request goes to the wrong place.
+ *
+ * NEXT_PUBLIC_ because the browser half needs it, which also makes it a BUILD
+ * argument: the value is compiled in, so changing it means rebuilding the
+ * image, not restarting the container.
+ */
+const configuredBasePath = (process.env.NEXT_PUBLIC_STUDIO_BASE_PATH || '').replace(/\/+$/u, '');
+
 const nextConfig: NextConfig = {
+  ...(configuredBasePath ? { basePath: configuredBasePath } : {}),
   output: process.env.VERCEL ? undefined : 'standalone',
   outputFileTracingIncludes: {
     '/*': [

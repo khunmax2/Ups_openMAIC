@@ -26,6 +26,7 @@ import {
 import { slideMediaReferenceSlots } from '@/lib/media/slide-media-slots';
 import { isConcreteMediaAddress } from '@/lib/media/resolve-media-ref';
 import { createLogger } from '@/lib/logger';
+import { apiPath } from '@/lib/base-path';
 
 const moduleLog = createLogger('ClassroomLoad');
 
@@ -258,7 +259,7 @@ export async function fetchClassroomFromApi(
   _shouldConvert: () => boolean = () => true,
   _deps: DocumentMigrationDeps = {},
 ): Promise<ClassroomPayload | null> {
-  const res = await fetch(`/api/classroom?id=${encodeURIComponent(classroomId)}`);
+  const res = await fetch(apiPath(`/api/classroom?id=${encodeURIComponent(classroomId)}`));
   if (!res.ok) return null;
 
   const json = (await res.json()) as {

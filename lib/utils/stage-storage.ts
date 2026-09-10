@@ -72,6 +72,7 @@ import {
   type MediaTaskLookupEntry,
 } from '@/lib/media/media-task-resolution';
 import { slideMediaReferenceSlots } from '@/lib/media/slide-media-slots';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('StageStorage');
 
@@ -735,7 +736,7 @@ async function performStageDeletion(stageId: string): Promise<void> {
  * keeps courses filed in this browser grouped.
  */
 async function listOwnerStagesFromServer(): Promise<StageListItem[]> {
-  const res = await fetch('/api/stages', { credentials: 'include' });
+  const res = await fetch(apiPath('/api/stages'), { credentials: 'include' });
   if (!res.ok) {
     throw new Error(`Failed to list owner stages: HTTP ${res.status}`);
   }
@@ -1155,7 +1156,7 @@ function toFolderRecord(folder: FolderRecord): FolderRecord {
  * or a created folder would not appear without a reload.
  */
 async function listOwnerFoldersFromServer(): Promise<FolderRecord[]> {
-  const res = await fetch('/api/folders', { credentials: 'include' });
+  const res = await fetch(apiPath('/api/folders'), { credentials: 'include' });
   if (!res.ok) {
     throw new Error(`Failed to list owner folders: HTTP ${res.status}`);
   }
@@ -1200,7 +1201,7 @@ function assertFolderName(name: string, existing: FolderRecord[], currentId?: st
  * classic home and the workbench dialogs map one error type.
  */
 async function createOwnerFolderFromServer(name: string): Promise<FolderRecord> {
-  const res = await fetch('/api/folders', {
+  const res = await fetch(apiPath('/api/folders'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -1248,7 +1249,7 @@ export async function createFolder(name: string): Promise<FolderRecord> {
 
 /** PG mode: rename a folder through the owner-scoped route. */
 async function renameOwnerFolderFromServer(id: string, name: string): Promise<void> {
-  const res = await fetch(`/api/folders/${encodeURIComponent(id)}`, {
+  const res = await fetch(apiPath(`/api/folders/${encodeURIComponent(id)}`), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -1289,7 +1290,7 @@ export type DeleteFolderMode = 'ungroup' | 'remove';
  * the server store and the device-side mirrors in the same state.
  */
 async function deleteOwnerFolderFromServer(id: string, mode: DeleteFolderMode): Promise<void> {
-  const res = await fetch(`/api/folders/${encodeURIComponent(id)}?mode=${mode}`, {
+  const res = await fetch(apiPath(`/api/folders/${encodeURIComponent(id)}?mode=${mode}`), {
     method: 'DELETE',
   });
   const body = (await res.json().catch(() => null)) as FolderRouteBody | null;

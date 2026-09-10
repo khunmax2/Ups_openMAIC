@@ -13,6 +13,7 @@ import type { SceneOutline } from '@/lib/types/generation';
 import type { MediaGenerationRequest } from '@/lib/media/types';
 import { fetchProxiedMediaUrl } from '@/lib/media/proxy-media-cache';
 import { createLogger } from '@/lib/logger';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('MediaOrchestrator');
 
@@ -273,7 +274,7 @@ async function callImageApi(
   const settings = useSettingsStore.getState();
   const providerConfig = settings.imageProvidersConfig?.[settings.imageProviderId];
 
-  const response = await fetch('/api/generate/image', {
+  const response = await fetch(apiPath('/api/generate/image'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -323,7 +324,7 @@ async function callVideoApi(
   const settings = useSettingsStore.getState();
   const providerConfig = settings.videoProvidersConfig?.[settings.videoProviderId];
 
-  const response = await fetch('/api/generate/video', {
+  const response = await fetch(apiPath('/api/generate/video'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

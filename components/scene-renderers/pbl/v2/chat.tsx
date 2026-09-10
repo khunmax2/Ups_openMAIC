@@ -60,6 +60,7 @@ import {
   TASK_DIVIDER_PREFIX,
   stripEmbeddedDividerMarkers,
 } from './protocol-markers';
+import { apiPath } from '@/lib/base-path';
 
 interface Props {
   readonly project: PBLProjectV2;
@@ -215,7 +216,7 @@ export function PBLV2Chat({
   const handleContinueHandover = async () => {
     if (chatBusy) return;
     try {
-      const res = await fetch('/api/pbl/v2/task/update', {
+      const res = await fetch(apiPath('/api/pbl/v2/task/update'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project, action: 'continue_handover' }),

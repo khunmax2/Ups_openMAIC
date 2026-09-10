@@ -23,6 +23,7 @@ import {
 import { WORKBENCH_MATERIAL_ACCEPT } from '@/lib/workbench/material-upload-policy';
 import { slashQuery } from '@/lib/workbench/composer-skills';
 import { ComposerPendingPill, ComposerPill, ComposerPillRow } from './composer-pill';
+import { apiPath } from '@/lib/base-path';
 
 // ── Skills (the `/` and composer `+` menus) ──────────────────────────────────
 //
@@ -291,7 +292,7 @@ let materialsProbe: Promise<boolean> | null = null;
 async function probeMaterialsEnabled(): Promise<boolean> {
   if (materialsEnabledCache !== null) return materialsEnabledCache;
   if (!materialsProbe) {
-    materialsProbe = fetch('/api/agent/runtime')
+    materialsProbe = fetch(apiPath('/api/agent/runtime'))
       .then(async (response) => (response.ok ? ((await response.json()) as unknown) : null))
       .then((body) => {
         const enabled =
