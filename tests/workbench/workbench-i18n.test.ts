@@ -58,8 +58,16 @@ describe('workbench translator locales', () => {
 describe('workbench copy covers every supported locale', () => {
   const source = flatten(workbenchEn);
 
-  it('has twelve locales to check', () => {
-    expect(supportedLocales.length).toBe(12);
+  it('has thirteen locales to check', () => {
+    // Thirteen since th-TH. The count is pinned deliberately: adding a locale
+    // has to be a decision someone makes here, not a side effect of dropping a
+    // JSON file into lib/i18n/locales.
+    //
+    // th-TH carries no entry in `localeOverrides` below, so the workbench copy
+    // falls back to English — `workbenchResourceFor` sends anything that is not
+    // zh-* to `workbenchEn`. That is the same choice the locale files make: for
+    // a Thai reader English is a gap they can read, and Chinese is not.
+    expect(supportedLocales.length).toBe(13);
     expect(source.size).toBeGreaterThanOrEqual(200);
   });
 
