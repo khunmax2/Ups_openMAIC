@@ -34,6 +34,7 @@ import { CLASSROOMS_DIR } from '@/lib/server/classroom-storage';
 import type { CourseToolDeps } from './course-tools';
 import { COURSE_STAGE_ID_DESCRIPTION } from './course-stage';
 import { errorResult, MEDIA_TOOL_ERROR_REASONS } from './media-tool-result';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('AgentGenerateImage');
 
@@ -173,7 +174,20 @@ export async function defaultPersistGeneratedImage({
   throwIfAborted(signal);
   await fs.writeFile(path.join(mediaDir, filename), bytes);
   throwIfAborted(signal);
-  return `/api/classroom-media/${stageId}/media/${filename}`;
+  // Prefixed with the base path on the way in, because this string is stored in
+  // the scene document and later handed to the browser as a `src`. The module
+  // comment in lib/server/media-origin.ts calls these references
+  // origin-independent, and they are -- but a base path is not an origin, and a
+  // bare /api/... resolves against the root, which on a shared host is another
+  // team's API rather than a 404.
+  //
+  // Written rather than rendered on purpose. The renderer lives in
+  // @openmaic/renderer, a package published on its own, and teaching it about
+  // this app's base path would point the wrong way. The cost is that a stored
+  // reference now carries the deployment's base path: change it and the stored
+  // rows need one UPDATE. That is recorded in the deploy runbook, and it is
+  // cheap while the database is still empty.
+  return apiPath(`/api/classroom-media/${stageId}/media/${filename}`);
 }
 
 /**

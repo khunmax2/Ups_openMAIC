@@ -32,6 +32,27 @@ export function apiPath(path: string): string {
   return `${base}${path}`;
 }
 
+/**
+ * The same prefixing, for a static file under `public/`.
+ *
+ * Next serves `public/` under the base path — `public/logos/openai.svg` really
+ * is at `/deepwitya/studio/logos/openai.svg` — but a `src` the application
+ * writes itself is not rewritten, so a bare `/logos/openai.svg` asks the origin
+ * root and gets whatever lives there. On a shared host that is somebody else,
+ * and in a browser it is a broken image with no error anyone reads.
+ *
+ * Applied where the value becomes a `src`, not where it is declared. These paths
+ * sit in constant tables — provider logos, default avatars — that are compared,
+ * stored and passed around; there are 154 such declarations and 18 places they
+ * are rendered, and only the rendered form is a URL.
+ *
+ * Accepts `undefined` and absolute URLs untouched, because a `src` is often one
+ * of those: a provider-hosted avatar, a `data:` URI, or nothing yet.
+ */
+export function assetPath<T extends string | undefined | null>(path: T): T {
+  return (typeof path === 'string' ? apiPath(path) : path) as T;
+}
+
 /** The configured base path, without a trailing slash. Empty when served at the root. */
 export function basePath(): string {
   return configured();

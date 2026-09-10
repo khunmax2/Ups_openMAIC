@@ -95,7 +95,7 @@ import {
   readLastWorkspaceSessionId,
   workspaceResumeHref,
 } from '@/lib/workbench/workspace-session-memory';
-import { apiPath } from '@/lib/base-path';
+import { apiPath, assetPath } from '@/lib/base-path';
 
 const log = createLogger('Home');
 
@@ -1453,7 +1453,7 @@ function GreetingBar() {
         >
           <div className="shrink-0 relative">
             <div className="size-8 rounded-full overflow-hidden ring-[1.5px] ring-border/30 group-hover:ring-violet-400/60 dark:group-hover:ring-violet-400/40 transition-all duration-300">
-              <img src={avatar} alt="" className="size-full object-cover" />
+              <img src={assetPath(avatar)} alt="" className="size-full object-cover" />
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full bg-white dark:bg-slate-800 border border-border/40 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity">
               <Pencil className="size-[7px] text-muted-foreground/70" />
@@ -1506,7 +1506,7 @@ function GreetingBar() {
                   }}
                 >
                   <div className="size-8 rounded-full overflow-hidden ring-[1.5px] ring-violet-300/70 dark:ring-violet-500/40 transition-all duration-300">
-                    <img src={avatar} alt="" className="size-full object-cover" />
+                    <img src={assetPath(avatar)} alt="" className="size-full object-cover" />
                   </div>
                   <motion.div
                     initial={{ scale: 0 }}
@@ -1599,7 +1599,7 @@ function GreetingBar() {
                                 : 'hover:ring-1 hover:ring-muted-foreground/30',
                             )}
                           >
-                            <img src={url} alt="" className="size-full" />
+                            <img src={assetPath(url)} alt="" className="size-full" />
                           </button>
                         ))}
                         <label

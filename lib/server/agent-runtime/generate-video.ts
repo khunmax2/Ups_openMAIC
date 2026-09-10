@@ -37,6 +37,7 @@ import { errorResult, MEDIA_TOOL_ERROR_REASONS } from './media-tool-result';
 import { runStageMutation } from './mutation-fence';
 import { registerPendingMedia, setPendingMediaStage, settlePendingMedia } from './pending-media';
 import { getAgentSessionStore } from './store';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('AgentGenerateVideo');
 
@@ -207,7 +208,20 @@ export async function defaultPersistGeneratedVideo({
   await fs.writeFile(path.join(mediaDir, filename), bytes);
   throwIfAborted(signal);
   return {
-    src: `/api/classroom-media/${stageId}/media/${filename}`,
+    // Prefixed with the base path on the way in, because this string is stored in
+    // the scene document and later handed to the browser as a `src`. The module
+    // comment in lib/server/media-origin.ts calls these references
+    // origin-independent, and they are -- but a base path is not an origin, and a
+    // bare /api/... resolves against the root, which on a shared host is another
+    // team's API rather than a 404.
+    //
+    // Written rather than rendered on purpose. The renderer lives in
+    // @openmaic/renderer, a package published on its own, and teaching it about
+    // this app's base path would point the wrong way. The cost is that a stored
+    // reference now carries the deployment's base path: change it and the stored
+    // rows need one UPDATE. That is recorded in the deploy runbook, and it is
+    // cheap while the database is still empty.
+    src: apiPath(`/api/classroom-media/${stageId}/media/${filename}`),
     mime,
   };
 }
@@ -324,13 +338,20 @@ export async function patchStageVideoPlaceholder(
   // the relative form this flow writes and the absolute form the classic
   // pipeline persists are recognized; scoped to the stage's own media root
   // so a user's pick copied from another stage is preserved.
-  const generatedPrefix = `/api/classroom-media/${stageId}/`;
+  // Both shapes, because rows written before the base path landed carry the bare
+  // form and rows written after carry the prefixed one. This decides whether a
+  // src is one we generated (replaceable) or the learner's own pick (preserved),
+  // so failing to recognise the older shape would start treating our own past
+  // output as something to protect.
+  const generatedSuffix = `/api/classroom-media/${stageId}/`;
+  const generatedPrefixes = [apiPath(generatedSuffix), generatedSuffix];
   const isReplaceableSrc = (value: unknown): boolean => {
     if (value === undefined || value === '' || value === ref) return true;
     if (typeof value !== 'string') return false;
-    if (value.startsWith(generatedPrefix)) return true;
+    if (generatedPrefixes.some((prefix) => value.startsWith(prefix))) return true;
     try {
-      return new URL(value).pathname.startsWith(generatedPrefix);
+      const { pathname } = new URL(value);
+      return generatedPrefixes.some((prefix) => pathname.startsWith(prefix));
     } catch {
       return false;
     }

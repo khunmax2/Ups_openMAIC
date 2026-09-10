@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils/cn';
 import { AGENT_DEFAULT_AVATARS } from '@/lib/constants/agent-defaults';
+import { assetPath } from '@/lib/base-path';
 
 interface AvatarPickerProps {
   readonly value: string;
@@ -28,7 +29,7 @@ export function AvatarPicker({ value, onChange }: AvatarPickerProps) {
           )}
         >
           {/* Static public path — no image optimizer needed. */}
-          <img src={src} alt="" className="size-full object-cover" draggable={false} />
+          <img src={assetPath(src)} alt="" className="size-full object-cover" draggable={false} />
         </button>
       ))}
     </div>
