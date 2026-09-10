@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, sep } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -67,24 +67,27 @@ describe('no bare same-origin request paths', () => {
   // stray one: the pattern is read by tools that lex before they parse.
   const BARE = /(?<![\w$.])(?:fetch|new EventSource)\(\s*['"\x60]\//gu;
 
+  /**
+   * One recursive directory walk, and no `statSync` per entry.
+   *
+   * The first version recursed by hand and stat'd everything it found. Reading
+   * every source file in four roots is this test's whole job, but doing it that
+   * way cost enough — under a full-suite run, beside 680 other files — to push
+   * timeout-sensitive tests elsewhere over the edge: the suite failed 81 and 87
+   * on two runs of the same tree against a 74-78 baseline, and excluding this
+   * one file brought it back to 75. The scan itself was never wrong; it was
+   * just expensive enough to be somebody else's problem.
+   */
   function sources(dir: string): string[] {
-    let found: string[] = [];
     let entries: string[];
     try {
-      entries = readdirSync(dir);
+      entries = readdirSync(dir, { recursive: true, encoding: 'utf8' });
     } catch {
-      return found;
+      return [];
     }
-    for (const entry of entries) {
-      const full = join(dir, entry);
-      if (statSync(full).isDirectory()) {
-        if (entry === 'node_modules') continue;
-        found = found.concat(sources(full));
-      } else if (/\.tsx?$/u.test(entry)) {
-        found.push(full);
-      }
-    }
-    return found;
+    return entries
+      .filter((entry) => /\.tsx?$/u.test(entry) && !entry.includes('node_modules'))
+      .map((entry) => join(dir, entry));
   }
 
   it('every fetch and EventSource goes through apiPath()', () => {
