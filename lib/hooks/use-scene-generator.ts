@@ -43,6 +43,7 @@ import {
   withGenerationRetry,
   type GenerationRetryOptions,
 } from '@openmaic/generation';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('SceneGenerator');
 
@@ -163,7 +164,7 @@ export async function fetchSceneContent(
   try {
     return await withGenerationRetry(
       async () => {
-        const response = await fetch('/api/generate/scene-content', {
+        const response = await fetch(apiPath('/api/generate/scene-content'), {
           method: 'POST',
           headers: getApiHeaders(),
           body: JSON.stringify(withThinkingConfig(params)),
@@ -212,7 +213,7 @@ export async function fetchSceneActions(
   try {
     return await withGenerationRetry(
       async () => {
-        const response = await fetch('/api/generate/scene-actions', {
+        const response = await fetch(apiPath('/api/generate/scene-actions'), {
           method: 'POST',
           headers: getApiHeaders(),
           body: JSON.stringify(withThinkingConfig(params)),
@@ -357,7 +358,7 @@ export async function generateAndStoreTTS(
   try {
     data = await withGenerationRetry(
       async () => {
-        const response = await fetch('/api/generate/tts', {
+        const response = await fetch(apiPath('/api/generate/tts'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

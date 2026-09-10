@@ -26,6 +26,7 @@ import { wbStyles as styles } from './chat-styles';
 import { formatDurationBetween } from './format';
 import { formatToolPayload, isSkillLoadTool, presentTool } from './tool-presentation';
 import { deriveToolProgress, progressLine } from './tool-progress';
+import { apiPath } from '@/lib/base-path';
 
 export type ToolStackPosition = 'single' | 'first' | 'middle' | 'last';
 
@@ -137,7 +138,7 @@ export function ToolCard({
     }
     setSkillContentLoading(true);
     setSkillContentError(false);
-    void fetch(`/api/agent/skills/${encodeURIComponent(createdSkillId)}`)
+    void fetch(apiPath(`/api/agent/skills/${encodeURIComponent(createdSkillId)}`))
       .then(async (response) => {
         if (!response.ok) throw new Error(`skill content request failed: ${response.status}`);
         const body = (await response.json()) as { content?: unknown };

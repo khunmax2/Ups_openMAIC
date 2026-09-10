@@ -40,6 +40,7 @@ import {
   type StageManifest,
 } from '@/lib/workbench/stage-freshness';
 import { applyGenerateTtsResultToScenes } from '@/lib/workbench/tts-stage-sync';
+import { apiPath } from '@/lib/base-path';
 
 /**
  * pi's own `AgentEvent` types, which the runner appends verbatim.
@@ -119,7 +120,7 @@ export function useWorkbenchStream(sessionId: string | null): void {
     // The header title wants the prompt before the runner emits session_start
     // (a queued session can sit there a while), and a `?session=` deep link
     // arrives without the session's own stage — one meta fetch covers both.
-    fetch(`/api/agent/sessions/${encodeURIComponent(sessionId)}`)
+    fetch(apiPath(`/api/agent/sessions/${encodeURIComponent(sessionId)}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((meta) => {
         // A switch away invalidates this attachment even if the user later
@@ -151,7 +152,7 @@ export function useWorkbenchStream(sessionId: string | null): void {
     // re-run this effect on every event and reconnect in a loop.
     const from = useWorkbenchStore.getState().lastEventId;
     const source = new EventSource(
-      `/api/agent/sessions/${encodeURIComponent(sessionId)}/events?lastEventId=${from}`,
+      apiPath(`/api/agent/sessions/${encodeURIComponent(sessionId)}/events?lastEventId=${from}`),
     );
 
     let connected = false;
@@ -626,7 +627,9 @@ export function useStageFreshnessSync(
     // ── triggers ───────────────────────────────────────────────────────────
     requestSync('mount');
 
-    const source = new EventSource(`/api/stages/${encodeURIComponent(requestedStage)}/freshness`);
+    const source = new EventSource(
+      apiPath(`/api/stages/${encodeURIComponent(requestedStage)}/freshness`),
+    );
     sourceRef.current = source;
     let streamHadError = false;
     const onFreshnessFrame = () => {

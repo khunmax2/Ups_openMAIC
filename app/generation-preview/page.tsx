@@ -61,6 +61,7 @@ import {
 } from './types';
 import { StepVisualizer } from './components/visualizers';
 import { resolveTaskEngineModeFromOutlineDoneEvent } from './vocational-mode';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('GenerationPreview');
 const OUTLINE_REVIEW_AUTO_CONTINUE_MS = 2500;
@@ -371,7 +372,7 @@ function GenerationPreviewContent() {
             if (providerConfig?.accessKeySecret?.trim()) {
               parseFormData.append('accessKeySecret', providerConfig.accessKeySecret);
             }
-            const parseResponse = await fetch('/api/extract-document', {
+            const parseResponse = await fetch(apiPath('/api/extract-document'), {
               method: 'POST',
               body: parseFormData,
               signal,
@@ -477,7 +478,7 @@ function GenerationPreviewContent() {
         const wsSettings = useSettingsStore.getState();
         const wsProviderId = wsSettings.webSearchProviderId;
         const wsConfig = wsSettings.webSearchProvidersConfig?.[wsProviderId];
-        const res = await fetch('/api/web-search', {
+        const res = await fetch(apiPath('/api/web-search'), {
           method: 'POST',
           headers: getApiHeaders(),
           body: JSON.stringify(
@@ -565,7 +566,7 @@ function GenerationPreviewContent() {
           let directive: string | undefined;
           let title: string | undefined;
 
-          fetch('/api/generate/scene-outlines-stream', {
+          fetch(apiPath('/api/generate/scene-outlines-stream'), {
             method: 'POST',
             headers: getApiHeaders(),
             body: JSON.stringify(
@@ -838,7 +839,7 @@ function GenerationPreviewContent() {
               settings.ttsProvidersConfig[settings.ttsProviderId],
             );
 
-          const agentResp = await fetch('/api/generate/agent-profiles', {
+          const agentResp = await fetch(apiPath('/api/generate/agent-profiles'), {
             method: 'POST',
             headers: getApiHeaders(),
             body: JSON.stringify(

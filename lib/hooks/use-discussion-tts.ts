@@ -24,6 +24,7 @@ import {
   markVoiceBindingUnavailable,
   trackAssignedVoiceBinding,
 } from '@/lib/audio/unavailable-voice-bindings';
+import { apiPath } from '@/lib/base-path';
 
 interface DiscussionTTSOptions {
   enabled: boolean;
@@ -238,7 +239,7 @@ export function useDiscussionTTS({ enabled, agents, onAudioStateChange }: Discus
         voiceId: item.voiceId,
         language: locale,
       });
-      const res = await fetch('/api/generate/tts', {
+      const res = await fetch(apiPath('/api/generate/tts'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

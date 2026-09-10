@@ -27,6 +27,7 @@ import { defaultWorkbenchTranslator, type WorkbenchCopyKey } from '@/lib/i18n/wo
 import { parseElementRefs, type ElementRef } from './element-refs';
 import { parseCourseRefs, type CourseRef } from './course-refs';
 import { appendCourseSighting, courseSightingsOf } from './run-courses';
+import { apiPath } from '@/lib/base-path';
 
 export type ChatNodeKind =
   | 'user'
@@ -1943,7 +1944,7 @@ export async function createWorkbenchSession(input: {
   stageId?: string;
   existingCourse?: boolean;
 }): Promise<WorkbenchSessionMeta> {
-  const res = await fetch('/api/agent/sessions', {
+  const res = await fetch(apiPath('/api/agent/sessions'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -1999,7 +2000,7 @@ export async function renameWorkbenchSession(
   sessionId: string,
   title: string | null,
 ): Promise<string | null> {
-  const res = await fetch(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, {
+  const res = await fetch(apiPath(`/api/agent/sessions/${encodeURIComponent(sessionId)}`), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ title }),
@@ -2021,7 +2022,7 @@ export async function renameWorkbenchSession(
 }
 
 export async function cancelWorkbenchSession(sessionId: string): Promise<void> {
-  const res = await fetch(`/api/agent/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+  const res = await fetch(apiPath(`/api/agent/sessions/${encodeURIComponent(sessionId)}/cancel`), {
     method: 'POST',
   });
   if (!res.ok) {
@@ -2086,18 +2087,21 @@ export async function postWorkbenchMessage(
   elementRefs: readonly ElementRef[] = [],
   courseRefs: readonly CourseRef[] = [],
 ): Promise<{ elementRefsAccepted: boolean; courseRefsAccepted: boolean }> {
-  const res = await fetch(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      ...(materials.length
-        ? { materialIds: materials.map((material) => material.materialId) }
-        : {}),
-      ...(elementRefs.length ? { elementRefs } : {}),
-      ...(courseRefs.length ? { courseRefs } : {}),
-    }),
-  });
+  const res = await fetch(
+    apiPath(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`),
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        ...(materials.length
+          ? { materialIds: materials.map((material) => material.materialId) }
+          : {}),
+        ...(elementRefs.length ? { elementRefs } : {}),
+        ...(courseRefs.length ? { courseRefs } : {}),
+      }),
+    },
+  );
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
     throw new Error(body.message ?? body.error ?? `POST messages -> ${res.status}`);
@@ -2134,7 +2138,7 @@ export class WorkbenchMaterialUploadError extends Error {
 
 /** Upload one file into the caller's durable material library. */
 export async function uploadWorkbenchMaterial(file: File): Promise<WorkbenchMaterial> {
-  const res = await fetch('/api/materials', {
+  const res = await fetch(apiPath('/api/materials'), {
     method: 'POST',
     headers: {
       'content-type': file.type || 'application/octet-stream',

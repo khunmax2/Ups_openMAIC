@@ -41,6 +41,7 @@ import {
   type QuizRuntimeGate,
   type QuizViewLifetime,
 } from '@/lib/quiz/view-state';
+import { apiPath } from '@/lib/base-path';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ async function gradeShortAnswerQuestion(
     if (modelConfig.baseUrl) headers['x-base-url'] = modelConfig.baseUrl;
     if (modelConfig.providerType) headers['x-provider-type'] = modelConfig.providerType;
 
-    const res = await fetch('/api/quiz-grade', {
+    const res = await fetch(apiPath('/api/quiz-grade'), {
       method: 'POST',
       headers,
       body: JSON.stringify({

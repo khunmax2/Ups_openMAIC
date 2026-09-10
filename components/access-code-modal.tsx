@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { ArrowRight, ShieldCheck, LoaderCircle } from 'lucide-react';
+import { apiPath } from '@/lib/base-path';
 
 interface AccessCodeModalProps {
   open: boolean;
@@ -31,7 +32,7 @@ export function AccessCodeModal({ open, onSuccess }: AccessCodeModalProps) {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/access-code/verify', {
+      const res = await fetch(apiPath('/api/access-code/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),

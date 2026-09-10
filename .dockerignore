@@ -1,5 +1,11 @@
 # dependencies
 node_modules
+# Nested ones too. A bare `node_modules` matches only the top level, so a
+# developer who has run `pnpm install` here ships packages/**/node_modules into
+# the build context, and `COPY . .` lays those over the ones the deps stage
+# built. pnpm's links are absolute, so on Windows they point at D:/... and the
+# build fails inside the image with a module the `ls` right beside it can see.
+**/node_modules
 .pnpm-store
 
 # build output

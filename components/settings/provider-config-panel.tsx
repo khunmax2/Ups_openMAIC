@@ -37,6 +37,7 @@ import type { ProviderConfig } from '@/lib/ai/providers';
 import type { ProvidersConfig } from '@/lib/types/settings';
 import { createVerifyModelRequest, formatContextWindow } from './utils';
 import { cn } from '@/lib/utils';
+import { apiPath } from '@/lib/base-path';
 
 interface ProviderConfigPanelProps {
   provider: ProviderConfig;
@@ -133,7 +134,7 @@ export function ProviderConfigPanel({
     const testModelId = availableModels[0].id;
 
     try {
-      const response = await fetch('/api/verify-model', {
+      const response = await fetch(apiPath('/api/verify-model'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
@@ -170,7 +171,7 @@ export function ProviderConfigPanel({
     setFetchStatus('fetching');
     setFetchMessage('');
     try {
-      const response = await fetch('/api/provider/probe-models', {
+      const response = await fetch(apiPath('/api/provider/probe-models'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ baseUrl: effectiveBaseUrl, apiKey, modelsUrl }),

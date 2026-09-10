@@ -9,6 +9,7 @@ import { Loader2, RefreshCw, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useTheme } from '@/lib/hooks/use-theme';
+import { apiPath } from '@/lib/base-path';
 
 echarts.use([LineChart, GridComponent, TooltipComponent, SVGRenderer]);
 
@@ -67,7 +68,7 @@ export function UsageDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/usage');
+      const res = await fetch(apiPath('/api/usage'));
       const json = await res.json();
       if (json.success !== false) setData(json as UsageResponse);
     } catch {

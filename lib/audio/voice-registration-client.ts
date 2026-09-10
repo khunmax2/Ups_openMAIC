@@ -13,6 +13,7 @@
 import { db } from '@/lib/utils/database';
 import { getDeterministicVoiceId, type VoiceDesign } from '@/lib/audio/voice-design';
 import { clearVoiceBindingUnavailable } from '@/lib/audio/unavailable-voice-bindings';
+import { apiPath } from '@/lib/base-path';
 
 export interface VoiceRegistrationRequestConfig {
   ttsApiKey?: string;
@@ -53,7 +54,7 @@ export async function registerVoiceFromReference(
   request: VoiceRegistrationRequestConfig,
 ): Promise<string> {
   const referenceAudioBase64 = await blobToBase64(params.referenceAudio);
-  const res = await fetch('/api/generate/voice', {
+  const res = await fetch(apiPath('/api/generate/voice'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -83,7 +84,7 @@ export async function deleteRegisteredVoice(
   request: VoiceRegistrationRequestConfig,
 ): Promise<boolean> {
   try {
-    const res = await fetch('/api/generate/voice', {
+    const res = await fetch(apiPath('/api/generate/voice'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ providerId, voiceId, action: 'delete', ...request }),
@@ -156,7 +157,7 @@ async function registerOnce(
   request: VoiceRegistrationRequestConfig,
 ): Promise<string | undefined> {
   const cached = await getCachedClip(voiceId);
-  const res = await fetch('/api/generate/voice', {
+  const res = await fetch(apiPath('/api/generate/voice'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

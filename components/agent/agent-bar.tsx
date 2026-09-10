@@ -27,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { AgentConfig } from '@/lib/orchestration/registry/types';
 import type { TTSProviderId } from '@/lib/audio/types';
 import type { ProviderWithVoices } from '@/lib/audio/voice-resolver';
+import { apiPath } from '@/lib/base-path';
 
 function matchesVoiceQuery(value: string | undefined, query: string): boolean {
   return !!value?.toLowerCase().includes(query);
@@ -153,7 +154,7 @@ function AgentVoicePill({
           voiceId,
           language: locale,
         });
-        const res = await fetch('/api/generate/tts', {
+        const res = await fetch(apiPath('/api/generate/tts'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -434,7 +435,7 @@ function TeacherVoicePill({
           voiceId,
           language: locale,
         });
-        const res = await fetch('/api/generate/tts', {
+        const res = await fetch(apiPath('/api/generate/tts'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

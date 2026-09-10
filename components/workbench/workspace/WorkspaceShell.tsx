@@ -116,6 +116,7 @@ import { WorkspaceChatPane } from './WorkspaceChatPane';
 import { WorkspaceClassroomPane } from './WorkspaceClassroomPane';
 import { PaneTab } from './PaneTab';
 import { ResizeHandle } from './ResizeHandle';
+import { apiPath } from '@/lib/base-path';
 
 const EMPTY_SESSIONS: ProHomeSessionItem[] = [];
 
@@ -136,7 +137,7 @@ async function fetchSessions(): Promise<ProHomeSessionItem[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SESSION_LIST_TIMEOUT_MS);
   try {
-    const response = await fetch('/api/agent/sessions', {
+    const response = await fetch(apiPath('/api/agent/sessions'), {
       credentials: 'include',
       signal: controller.signal,
     });

@@ -49,6 +49,7 @@ import {
   type AgentSkillInfo,
 } from '@/lib/workbench/agent-skills';
 import { cn } from '@/lib/utils';
+import { apiPath } from '@/lib/base-path';
 
 /**
  * The real Download affordance for one skill. A plain anchor to the export
@@ -216,7 +217,7 @@ function useUserSkillContent(id: string | null): SkillContentState & { retry: ()
     // skill's body never flashes under the new one's loading state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ loading: true, failed: false, content: null });
-    fetch(`/api/agent/skills/${encodeURIComponent(id)}`)
+    fetch(apiPath(`/api/agent/skills/${encodeURIComponent(id)}`))
       .then(async (res) => {
         if (!res.ok) throw new Error(`skill detail request failed: ${res.status}`);
         const body = (await res.json()) as { id: string; content: string };
@@ -361,9 +362,12 @@ export function SkillSettings() {
     setDeleting(true);
     setActionError(null);
     try {
-      const response = await fetch(`/api/agent/skills/${encodeURIComponent(deleteSkill.id)}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        apiPath(`/api/agent/skills/${encodeURIComponent(deleteSkill.id)}`),
+        {
+          method: 'DELETE',
+        },
+      );
       if (!response.ok) throw new Error(`skill delete request failed: ${response.status}`);
       setHiddenSkillIds((current) => new Set(current).add(deleteSkill.id));
       setDeleteSkill(null);
@@ -383,7 +387,7 @@ export function SkillSettings() {
       try {
         const form = new FormData();
         form.set('file', file);
-        const response = await fetch('/api/agent/skills', { method: 'POST', body: form });
+        const response = await fetch(apiPath('/api/agent/skills'), { method: 'POST', body: form });
         if (!response.ok) throw new Error(`skill upload request failed: ${response.status}`);
         const uploaded = (await response.json()) as AgentSkillInfo;
         setUploadedSkills((current) => [

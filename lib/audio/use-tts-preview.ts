@@ -6,6 +6,7 @@ import {
   isBrowserTTSAbortError,
   playBrowserTTSPreview,
 } from '@/lib/audio/browser-tts-preview';
+import { apiPath } from '@/lib/base-path';
 
 export interface TTSPreviewOptions {
   text: string;
@@ -105,7 +106,7 @@ export function useTTSPreview() {
         if (options.baseUrl?.trim()) body.ttsBaseUrl = options.baseUrl;
         if (options.providerOptions) body.ttsProviderOptions = options.providerOptions;
 
-        const res = await fetch('/api/generate/tts', {
+        const res = await fetch(apiPath('/api/generate/tts'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),

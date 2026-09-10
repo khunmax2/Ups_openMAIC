@@ -1,3 +1,5 @@
+import { apiPath } from '@/lib/base-path';
+
 /**
  * Session-scoped negative cache for /api/proxy-media responses.
  *
@@ -329,7 +331,7 @@ async function performProxiedFetch(
 ): Promise<SharedMediaResult> {
   let response: Response;
   try {
-    response = await fetch('/api/proxy-media', {
+    response = await fetch(apiPath('/api/proxy-media'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),

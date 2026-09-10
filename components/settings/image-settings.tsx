@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ImageProviderId } from '@/lib/media/types';
+import { apiPath } from '@/lib/base-path';
 
 interface ImageSettingsProps {
   selectedProviderId: ImageProviderId;
@@ -74,7 +75,7 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
     setWorkflowsLoading(true);
     setWorkflowsError(null);
     try {
-      const res = await fetch('/api/comfyui-workflows');
+      const res = await fetch(apiPath('/api/comfyui-workflows'));
       const data = await res.json();
       setWorkflows(data.workflows || []);
     } catch (err) {
@@ -120,7 +121,7 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
     setTestStatus('idle');
     setTestMessage('');
     try {
-      const response = await fetch('/api/verify-image-provider', {
+      const response = await fetch(apiPath('/api/verify-image-provider'), {
         method: 'POST',
         headers: {
           'x-image-provider': selectedProviderId,

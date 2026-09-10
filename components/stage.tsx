@@ -26,6 +26,7 @@ import { useWorkbenchStore } from '@/lib/workbench/session-store';
 import { useWorkbenchPanelState } from '@/lib/workbench/panel-context';
 import { workspaceHref } from '@/lib/workbench/workspace-panes';
 import { exitProPlaybackToStandalone } from '@/lib/workbench/pro-playback-exit';
+import { apiPath } from '@/lib/base-path';
 
 /**
  * Stage — top-level classroom container. Standalone classrooms dispatch
@@ -73,7 +74,7 @@ export function Stage({
   useEffect(() => {
     if (!proWorkbenchFlag) return;
     let cancelled = false;
-    fetch('/api/agent/runtime')
+    fetch(apiPath('/api/agent/runtime'))
       .then((res) => (res.ok ? res.json() : null))
       .then((body) => {
         if (!cancelled) setProRuntime(body?.enabled === true ? 'on' : 'off');

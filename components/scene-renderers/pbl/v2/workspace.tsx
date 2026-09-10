@@ -32,6 +32,7 @@ import { useI18n } from '@/lib/hooks/use-i18n';
 import type { CSSProperties } from 'react';
 import { runOneStream, type StreamDisplayState, type StreamStatus } from './use-instructor-stream';
 import type { PBLProjectPatch } from '@/lib/pbl/v2/api/sse';
+import { apiPath } from '@/lib/base-path';
 
 interface Props {
   readonly project: PBLProjectV2;
@@ -145,7 +146,7 @@ export function PBLV2Workspace({
       if (sceneBusy) return;
       setSceneBusy(true);
       try {
-        const res = await fetch('/api/pbl/v2/task/update', {
+        const res = await fetch(apiPath('/api/pbl/v2/task/update'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ project, action }),
@@ -231,7 +232,7 @@ export function PBLV2Workspace({
     setTaskBusy(true);
     onInstructorStreamingChange(true);
     try {
-      const res = await fetch('/api/pbl/v2/task/update', {
+      const res = await fetch(apiPath('/api/pbl/v2/task/update'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project, action: 'complete_pending_task' }),

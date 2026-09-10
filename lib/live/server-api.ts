@@ -1,4 +1,5 @@
 import { createLogger } from '@/lib/logger';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('ServerAPI');
 
@@ -31,7 +32,7 @@ export class StageRenameError extends Error {
  * was persisted rather than what was typed.
  */
 export async function apiRenameStage(id: string, name: string): Promise<string> {
-  const res = await fetch(`/api/stages/${encodeURIComponent(id)}`, {
+  const res = await fetch(apiPath(`/api/stages/${encodeURIComponent(id)}`), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',

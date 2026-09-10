@@ -6,6 +6,7 @@ import {
   type WorkbenchCopyKey,
   type WorkbenchTranslator,
 } from '@/lib/i18n/workbench';
+import { apiPath } from '@/lib/base-path';
 
 export interface AgentSkillInfo {
   /** Stable internal id submitted to APIs (usk_* for a user Skill). */
@@ -70,7 +71,7 @@ function loadAgentSkills(force = false): Promise<AgentSkillInfo[]> {
   if (skillsRequest) return skillsRequest;
   const requestEpoch = ownerEpoch;
   publish({ ...snapshot, loading: true, error: null });
-  skillsRequest = fetch('/api/agent/skills')
+  skillsRequest = fetch(apiPath('/api/agent/skills'))
     .then(async (res) => {
       if (!res.ok) throw new AgentSkillsError('workbench.skill.listFailed', String(res.status));
       return (await res.json()) as AgentSkillInfo[];

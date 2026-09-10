@@ -95,6 +95,7 @@ import {
   readLastWorkspaceSessionId,
   workspaceResumeHref,
 } from '@/lib/workbench/workspace-session-memory';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('Home');
 
@@ -142,7 +143,7 @@ function HomePage() {
   useEffect(() => {
     if (!workbenchBuildEnabled || workbenchRuntimeCache !== null) return;
     let cancelled = false;
-    fetch('/api/agent/runtime')
+    fetch(apiPath('/api/agent/runtime'))
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
         workbenchRuntimeCache = body?.enabled === true;

@@ -42,6 +42,7 @@ import { nanoid } from 'nanoid';
 import type { BaiduSubSources, WebSearchProviderId } from '@/lib/web-search/types';
 import { getPersistenceRequestHeaders } from '@/lib/persistence/bootstrap';
 import { refreshWhiteboardRuntimeProjection } from '@/lib/whiteboard/runtime/browser-projection';
+import { apiPath } from '@/lib/base-path';
 
 const log = createLogger('ChatSessions');
 const SOFT_CLOSE_TIMEOUT_MS = 15_000;
@@ -391,7 +392,7 @@ export async function runPiSingleRequest(
 ): Promise<void> {
   const consumer = createConsumer(sessionId, controller, sessionType);
   const persistenceHeaders = await getPersistenceRequestHeaders();
-  const response = await fetch('/api/chat/pi', {
+  const response = await fetch(apiPath('/api/chat/pi'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...persistenceHeaders },
     body: JSON.stringify(requestTemplate),
@@ -471,7 +472,7 @@ export async function respondToWhiteboardVisibilityQuery(
   const headers = await getPersistenceRequestHeaders();
   if (signal.aborted || useStageStore.getState().stage?.id !== data.stageId) return;
   const visibility = useCanvasStore.getState().whiteboardOpen ? 'open' : 'closed';
-  const response = await fetch('/api/chat/pi/whiteboard-visibility', {
+  const response = await fetch(apiPath('/api/chat/pi/whiteboard-visibility'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({
@@ -1304,7 +1305,7 @@ export function useChatSessions(options: UseChatSessionsOptions = {}) {
           },
 
           fetchChat: (body, signal) =>
-            fetch('/api/chat', {
+            fetch(apiPath('/api/chat'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(body),

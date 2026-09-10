@@ -49,6 +49,10 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 FROM base AS builder
 
 ARG ALLOWED_FRAME_ANCESTORS
+# Fork addition. The path this image serves under, read by next.config.ts for
+# `basePath` and by lib/base-path.ts for the URLs the app writes itself. Both
+# halves have to agree, which is why there is one variable and not two.
+ARG NEXT_PUBLIC_STUDIO_BASE_PATH
 ARG NEXT_PUBLIC_PERSISTENCE
 ARG NEXT_PUBLIC_PERSISTENCE_TOKEN
 ARG NEXT_PUBLIC_MAIC_EDITOR_ENABLED
@@ -60,6 +64,7 @@ ARG NEXT_PUBLIC_ENABLE_VIDEO_EXPORT
 ARG NEXT_PUBLIC_VIDEO_EXPORT_CTA_DESTINATION
 ARG NEXT_PUBLIC_ENABLE_PPTX_IMPORT
 ENV ALLOWED_FRAME_ANCESTORS=$ALLOWED_FRAME_ANCESTORS
+ENV NEXT_PUBLIC_STUDIO_BASE_PATH=$NEXT_PUBLIC_STUDIO_BASE_PATH
 ENV NEXT_PUBLIC_PERSISTENCE=$NEXT_PUBLIC_PERSISTENCE
 ENV NEXT_PUBLIC_PERSISTENCE_TOKEN=$NEXT_PUBLIC_PERSISTENCE_TOKEN
 ENV NEXT_PUBLIC_MAIC_EDITOR_ENABLED=$NEXT_PUBLIC_MAIC_EDITOR_ENABLED
@@ -82,6 +87,16 @@ RUN pnpm build
 FROM node:22-alpine AS runner
 
 ARG ALPINE_MIRROR=""
+
+# Fork addition, and it has to be here as well as in the builder. Next inlines
+# NEXT_PUBLIC_* into the BROWSER bundle at build; server code still reads
+# process.env at run time. This variable is read by both halves -- next.config's
+# `basePath` and the client's apiPath() at build, and the persistence route's
+# prefix arithmetic at run time -- so a builder-only value leaves the server
+# thinking it is mounted at the origin root. The symptom is every persistence
+# path answering ROUTE_NOT_FOUND while the pages themselves serve correctly.
+ARG NEXT_PUBLIC_STUDIO_BASE_PATH
+ENV NEXT_PUBLIC_STUDIO_BASE_PATH=$NEXT_PUBLIC_STUDIO_BASE_PATH
 
 WORKDIR /app
 

@@ -26,6 +26,7 @@
  *     a real course of a few hundred scenes never trips the endpoint's 400.
  */
 import type { Scene } from '@/lib/types/stage';
+import { apiPath } from '@/lib/base-path';
 
 export interface StageManifestScene {
   id: string;
@@ -106,7 +107,7 @@ export type ManifestFetchResult =
  */
 export async function fetchStageManifest(stageId: string): Promise<ManifestFetchResult> {
   try {
-    const response = await fetch(`/api/stages/${encodeURIComponent(stageId)}/manifest`, {
+    const response = await fetch(apiPath(`/api/stages/${encodeURIComponent(stageId)}/manifest`), {
       credentials: 'include',
     });
     if (response.status === 404) return { status: 'missing' };
@@ -147,7 +148,7 @@ export async function fetchScenesByIds(stageId: string, ids: readonly string[]):
 async function fetchSceneChunk(stageId: string, ids: readonly string[]): Promise<Scene[]> {
   const params = new URLSearchParams({ ids: ids.join(',') });
   const response = await fetch(
-    `/api/stages/${encodeURIComponent(stageId)}/scenes?${params.toString()}`,
+    apiPath(`/api/stages/${encodeURIComponent(stageId)}/scenes?${params.toString()}`),
     { credentials: 'include' },
   );
   if (!response.ok) return [];

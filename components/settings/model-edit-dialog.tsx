@@ -12,6 +12,7 @@ import type { EditingModel } from '@/lib/types/settings';
 import type { ProviderId } from '@/lib/ai/providers';
 import { cn } from '@/lib/utils';
 import { createVerifyModelRequest } from './utils';
+import { apiPath } from '@/lib/base-path';
 
 interface ModelEditDialogProps {
   open: boolean;
@@ -70,7 +71,7 @@ export function ModelEditDialog({
     setTestMessage('');
 
     try {
-      const response = await fetch('/api/verify-model', {
+      const response = await fetch(apiPath('/api/verify-model'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
