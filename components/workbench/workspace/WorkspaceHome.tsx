@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils/cn';
 import { ProBadge } from '@/components/workbench/ProBadge';
 import { ProLaunchPanel } from '@/components/workbench/ProLaunchPanel';
 import type { CourseMentionSource } from '@/lib/workbench/course-mention';
+import { assetPath } from '@/lib/base-path';
 
 export function WorkspaceHome({
   composerReset,
@@ -82,7 +83,7 @@ export function WorkspaceHome({
           plain button, not a second ProBadge: two elements answering to
           `pro-mode-exit` would be one testid too many. */}
       <div className="flex h-12 shrink-0 items-center justify-between px-4 md:hidden">
-        <img src={brand.logoSrc} alt={brand.productName} className="h-5 w-auto" />
+        <img src={assetPath(brand.logoSrc)} alt={brand.productName} className="h-5 w-auto" />
         <button
           type="button"
           data-testid="pro-workspace-exit-compact"
@@ -128,7 +129,11 @@ export function WorkspaceHome({
                 // A brand whose mark carries no wordmark gets the product name
                 // beside it, exactly as the classic hero does.
                 <div className="flex items-center gap-3">
-                  <img src={brand.markSrc} alt={brand.productName} className="size-11 md:size-14" />
+                  <img
+                    src={assetPath(brand.markSrc)}
+                    alt={brand.productName}
+                    className="size-11 md:size-14"
+                  />
                   <span
                     className="text-xl font-semibold tracking-tight md:text-2xl"
                     style={{ color: brand.themeColor }}
@@ -138,7 +143,7 @@ export function WorkspaceHome({
                 </div>
               ) : (
                 <img
-                  src={brand.logoSrc}
+                  src={assetPath(brand.logoSrc)}
                   alt={brand.productName}
                   data-testid="pro-workspace-hero-logo"
                   className="ws-hero-logo"

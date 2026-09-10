@@ -89,6 +89,11 @@ describe('no bare same-origin request paths', () => {
     // and prefixing it would send the request to this origin instead.
     /(?:baseUrl|endpoint|url)\s*:\s*['"\x60]\/api\//gu,
     /create(?:EventSource|Source)\(\s*['"\x60]\//gu,
+    // A static file under public/ rendered with a literal src. Next serves
+    // public/ under the base path, but does not rewrite a src the app writes,
+    // so a bare one asks the origin root -- 126 requests for /logos/*.svg
+    // answered 404 on the first run, and a broken image reports nothing.
+    /<(?:img|Image)\b[^>]{0,200}?\bsrc=['"]\//gu,
   ];
 
   /**
@@ -154,5 +159,7 @@ describe('no bare same-origin request paths', () => {
     expect(hits("await fetch(apiPath('/api/stages'))")).toBe(0);
     expect(hits("baseUrl: apiPath('/api/persistence')")).toBe(0);
     expect(hits("await prefetch('/api/x')")).toBe(0);
+    expect(hits('<img src="/logo-horizontal.png" alt="" />')).toBe(1);
+    expect(hits('<img src={assetPath(brand.logoSrc)} alt="" />')).toBe(0);
   });
 });

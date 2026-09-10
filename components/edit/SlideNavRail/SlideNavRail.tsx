@@ -23,6 +23,7 @@ import { useInWorkbenchPanel } from '@/lib/workbench/panel-context';
 import type { Scene } from '@/lib/types/stage';
 import { ThumbItem } from './ThumbItem';
 import { InsertionZone } from './InsertionZone';
+import { assetPath } from '@/lib/base-path';
 
 // Collapsed, the rail is a slim edge handle — just wide enough to hold the
 // expand chevron — rather than a narrow column of page numbers. The point of
@@ -408,7 +409,7 @@ export function SlideNavRail() {
             >
               {/* Desktop client: the Electron title bar already shows the brand icon + name, so the edit rail doesn't repeat it;
                   returning home is handled by the edit bar's CommandBar back arrow. */}
-              <img src={brand.logoSrc} alt={brand.productName} className="h-6 w-auto" />
+              <img src={assetPath(brand.logoSrc)} alt={brand.productName} className="h-6 w-auto" />
             </button>
           )}
         </div>

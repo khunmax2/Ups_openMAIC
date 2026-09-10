@@ -24,6 +24,7 @@ import type { PBLProjectV2, PBLScenarioCharacter } from '@/lib/pbl/v2/types';
 import { trimmedPBLText } from '@/lib/pbl/v2/readers';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { sanitizeSceneVisual } from './scene-types';
+import { assetPath } from '@/lib/base-path';
 
 interface Props {
   readonly project: PBLProjectV2;
@@ -195,7 +196,13 @@ function BriefingAvatar({
       aria-hidden
     >
       {isImg ? (
-        <Image src={avatar} alt="" width={32} height={32} className="h-8 w-8 object-cover" />
+        <Image
+          src={assetPath(avatar)}
+          alt=""
+          width={32}
+          height={32}
+          className="h-8 w-8 object-cover"
+        />
       ) : (
         initial
       )}

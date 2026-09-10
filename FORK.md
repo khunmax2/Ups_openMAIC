@@ -91,6 +91,21 @@ origin, so it is a request sent to another team's `/api`.
   `NEXT_PUBLIC_` also makes it a **build argument**: changing it means
   rebuilding the image, not restarting the container.
 
+### Static files under `public/` need the prefix too
+
+Next serves `public/` under the base path — `public/logos/openai.svg` really is
+at `/deepwitya/studio/logos/openai.svg` — but a `src` the application writes is
+not rewritten. Running the studio behind a base path produced 126 requests for
+`/logos/*.svg` at the origin root, all 404, and a broken image reports nothing:
+no console error, no failed check, just a picture that is not there.
+
+`assetPath()` is applied where a value becomes a `src`, not where it is
+declared. There are 154 such declarations — provider logos, default avatars, in
+constant tables that are compared, stored and passed around — and 18 places they
+are rendered. Only the rendered form is a URL. It accepts `undefined` and
+absolute URLs untouched, because a `src` is often a provider-hosted avatar, a
+`data:` URI, or nothing yet.
+
 ### Media references carry the base path, and that has a cost
 
 `generate-image.ts`, `generate-video.ts` and `classroom-media-bytes.ts` write a
