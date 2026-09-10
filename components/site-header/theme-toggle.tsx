@@ -6,6 +6,7 @@ import { useTheme } from '@/lib/hooks/use-theme';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { cn } from '@/lib/utils';
 import '@/components/workbench/workspace/pro-popover-scope.css';
+import { useIsEmbedded } from '@/lib/hooks/use-embed';
 
 const OPTIONS = [
   { value: 'light', icon: Sun },
@@ -14,6 +15,7 @@ const OPTIONS = [
 ] as const;
 
 export function ThemeToggle() {
+  const embedded = useIsEmbedded();
   const { theme, setTheme } = useTheme();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -27,6 +29,11 @@ export function ThemeToggle() {
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
+
+  // A host that supplied `?theme=` owns this setting; see useIsEmbedded. Placed
+  // after every hook: an early return above them would call useEffect
+  // conditionally, which is the one thing the rules of hooks forbid outright.
+  if (embedded) return null;
 
   const ActiveIcon = OPTIONS.find((o) => o.value === theme)?.icon ?? Monitor;
 

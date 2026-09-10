@@ -21,9 +21,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Hydrate from localStorage after mount (avoids SSR mismatch)
   /* eslint-disable react-hooks/set-state-in-effect -- Hydration from localStorage must happen in effect */
   useEffect(() => {
-    const stored = localStorage.getItem('theme') as Theme | null;
+    // `?theme=dark` lets a host choose the theme, the counterpart to `?lang=`
+    // in use-i18n. An embedder on another origin cannot reach this storage key,
+    // and matching the surrounding app's light/dark state is the difference
+    // between an embed that reads as one product and one that reads as two.
+    const fromQuery = new URLSearchParams(window.location.search).get('theme');
+    const stored = (fromQuery ?? localStorage.getItem('theme')) as Theme | null;
     if (stored && ['light', 'dark', 'system'].includes(stored)) {
       setThemeState(stored);
+      // Persist a host-supplied theme, so it survives navigation that does not
+      // carry the query.
+      if (fromQuery) localStorage.setItem('theme', stored);
     }
     setSystemTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   }, []);

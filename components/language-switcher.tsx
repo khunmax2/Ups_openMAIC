@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useIsEmbedded } from '@/lib/hooks/use-embed';
 
 interface LanguageSwitcherProps {
   /** Called when the dropdown opens, so parent can close sibling dropdowns. */
@@ -22,7 +23,13 @@ interface LanguageSwitcherProps {
  * otherwise clip the dropdown).
  */
 export function LanguageSwitcher({ onOpen }: LanguageSwitcherProps) {
+  const embedded = useIsEmbedded();
   const { locale, setLocale } = useI18n();
+
+  // Gated here rather than at each call site: this pill is rendered from the
+  // home page, the classroom header and the Pro rail, and a host that supplied
+  // `?lang=` wants it gone from all three.
+  if (embedded) return null;
 
   return (
     <DropdownMenu

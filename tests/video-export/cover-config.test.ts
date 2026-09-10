@@ -179,6 +179,11 @@ describe('getVideoExportCoverLabels', () => {
       pblCtaPrompt: '¿Quieres explorar el aprendizaje basado en proyectos?',
       ctaVisit: 'Visita',
     },
+    'th-TH': {
+      quizCtaPrompt: 'อยากลองทำแบบทดสอบแบบโต้ตอบไหม',
+      pblCtaPrompt: 'อยากลองเรียนรู้ผ่านโครงงานไหม',
+      ctaVisit: 'เยี่ยมชม',
+    },
     'fr-FR': {
       quizCtaPrompt: 'Envie d’essayer un quiz interactif ?',
       pblCtaPrompt: 'Envie d’explorer l’apprentissage par projet ?',
