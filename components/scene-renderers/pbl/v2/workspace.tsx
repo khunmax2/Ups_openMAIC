@@ -12,6 +12,7 @@
  */
 
 import type { PBLMilestone, PBLProjectV2 } from '@/lib/pbl/v2/types';
+import { useBrand } from '@/lib/brand/brand-context';
 import Image from 'next/image';
 import { Maximize2, Workflow } from 'lucide-react';
 import {
@@ -431,6 +432,7 @@ function WorkspaceTopBar({
   readonly onReturnToHero: () => void;
   readonly onExpand?: () => void;
 }) {
+  const brand = useBrand();
   const { t } = useI18n();
   return (
     <header
@@ -443,8 +445,8 @@ function WorkspaceTopBar({
       <div className="relative flex min-w-0 flex-1 items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-200/25 bg-violet-100/[0.08] shadow-[0_0_24px_rgba(157,140,255,0.18)]">
           <Image
-            src={assetPath('/openmaic-mark.png')}
-            alt="OpenMAIC"
+            src={assetPath(brand.markSrc)}
+            alt={brand.productName}
             width={28}
             height={28}
             className="h-6 w-6"

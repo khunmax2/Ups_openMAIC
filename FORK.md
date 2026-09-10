@@ -162,6 +162,26 @@ have produced a confident mistranslation rather than a visible gap. The
 remaining 45 were gone. Compare the *old* English against the new before moving
 any translation; the archive at `origin/archive/main-2026-09-09` still has it.
 
+### A self-hosted TTS engine can declare its own voices
+
+Pointing a TTS provider at your own base URL already worked — the setting is
+upstream's. What did not work was synthesis: a self-hosted engine serves one
+voice under its own name, the client's picker sends whichever default it had,
+and the request came back refused for a voice the engine never had. Well-formed,
+authorised, and impossible to diagnose from the UI.
+
+So the server entry can declare `voices` (in `server-providers.yml`, or
+`<PREFIX>_VOICES`), and `resolveTTSVoice` treats them as authoritative exactly
+the way `models` already is: the client's choice is honoured if it is one of
+them, and otherwise the first declared voice wins. Declaring nothing keeps
+upstream's behaviour, which is the right one for a hosted provider whose voice
+list we do not own.
+
+**Image generation needed no change at all.** `openai-image` already carries a
+`baseUrl` the settings screen edits and the route honours, so an
+OpenAI-compatible endpoint is a matter of configuration. Worth writing down
+because it looked like a feature request and was a setting.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

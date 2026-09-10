@@ -29,6 +29,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
+import { useBrand } from '@/lib/brand/brand-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { createLogger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
@@ -129,6 +130,7 @@ const initialFormState: FormState = {
 
 function HomePage() {
   const { t } = useI18n();
+  const brand = useBrand();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   // Do not replay the classic hero's entrance after the route handoff already
@@ -834,8 +836,8 @@ function HomePage() {
         {/* ── Logo ── */}
         <div className="relative" data-pro-morph="lockup">
           <motion.img
-            src="/logo-horizontal.png"
-            alt="OpenMAIC"
+            src={assetPath(brand.logoSrc)}
+            alt={brand.productName}
             initial={heroEnter({ opacity: 0, scale: 0.9 })}
             animate={{ opacity: 1, scale: 1 }}
             transition={{
@@ -863,7 +865,7 @@ function HomePage() {
           transition={{ delay: 0.25 }}
           className="text-sm text-muted-foreground/60 mb-8"
         >
-          {t('home.slogan')}
+          {brand.tagline}
         </motion.p>
 
         {/* ── Unified input area ── */}

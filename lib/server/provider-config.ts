@@ -26,6 +26,14 @@ interface ServerProviderEntry {
   apiKey: string;
   baseUrl?: string;
   models?: string[];
+  /**
+   * TTS only: the voice ids this server actually serves. A self-hosted engine
+   * usually has exactly one, and it is never the built-in default the client
+   * would send — so when this is set it is authoritative, exactly as `models`
+   * is. Without it, pointing a TTS provider at your own endpoint works right
+   * up until synthesis, which then fails on a voice the engine never had.
+   */
+  voices?: string[];
   proxy?: string;
   /** Aliyun AccessKey ID (AliDocMind — uses AK/SK instead of a single apiKey). */
   accessKeyId?: string;
@@ -263,6 +271,7 @@ function loadEnvSection(
           apiKey: entry.apiKey || '',
           baseUrl: entry.baseUrl,
           models: normalizeModelList(entry.models),
+          voices: normalizeModelList(entry.voices),
           proxy: entry.proxy,
         };
       }
@@ -273,6 +282,13 @@ function loadEnvSection(
   for (const [prefix, providerId] of Object.entries(envMap)) {
     const envApiKey = process.env[`${prefix}_API_KEY`] || undefined;
     const envBaseUrl = process.env[`${prefix}_BASE_URL`] || undefined;
+    const envVoicesStr = process.env[`${prefix}_VOICES`];
+    const envVoices = envVoicesStr
+      ? envVoicesStr
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : undefined;
     const envModelsStr = process.env[`${prefix}_MODELS`];
     const envModels = envModelsStr
       ? envModelsStr
@@ -286,6 +302,7 @@ function loadEnvSection(
       if (envApiKey) result[providerId].apiKey = envApiKey;
       if (envBaseUrl) result[providerId].baseUrl = envBaseUrl;
       if (envModels) result[providerId].models = envModels;
+      if (envVoices) result[providerId].voices = envVoices;
       continue;
     }
 
@@ -300,6 +317,7 @@ function loadEnvSection(
       apiKey: envApiKey || '',
       baseUrl: envBaseUrl,
       models: envModels,
+      voices: envVoices,
     };
   }
 
@@ -664,10 +682,16 @@ export function resolveProxy(providerId: string): string | undefined {
  * providers (`{ disabled: true }`). A force-disabled provider is reported as
  * disabled even when it is otherwise configured — disable wins (#665).
  */
-export function getServerTTSProviders(): Record<string, { disabled?: boolean }> {
+export function getServerTTSProviders(): Record<string, { disabled?: boolean; voices?: string[] }> {
   const cfg = getConfig();
-  const result: Record<string, { disabled?: boolean }> = {};
-  for (const id of Object.keys(cfg.tts)) result[id] = {};
+  const result: Record<string, { disabled?: boolean; voices?: string[] }> = {};
+  // Voices, unlike keys and base URLs, are safe to expose: they are the names
+  // of what the operator has made available, and the picker has to show them
+  // or it offers voices that do not exist.
+  for (const [id, entry] of Object.entries(cfg.tts)) {
+    const voices = entry?.voices?.filter(Boolean) ?? [];
+    result[id] = voices.length > 0 ? { voices } : {};
+  }
   for (const id of cfg.disabled.tts) result[id] = { disabled: true };
   return result;
 }
@@ -1031,4 +1055,25 @@ export function getParallelSceneConcurrency(): number {
   const raw = Number.parseInt(process.env.PARALLEL_SCENE_CONCURRENCY ?? '', 10);
   if (!Number.isFinite(raw) || raw <= 0) return 0;
   return Math.min(raw, 10);
+}
+
+/**
+ * Resolve the TTS voice, mirroring {@link resolveTTSModel}.
+ *
+ * When the server entry declares voices, they are what the engine actually has:
+ * the client's choice is honoured only if it is one of them, and otherwise the
+ * first declared voice wins. A self-hosted engine typically serves one voice
+ * under its own name, and the client sends whichever default its picker had —
+ * so without this the request is well-formed, authorised, and refused by the
+ * engine for a voice it never had.
+ *
+ * With nothing declared, the client's choice passes through unchanged, which is
+ * upstream's behaviour and the right one for a hosted provider whose voice list
+ * we do not own.
+ */
+export function resolveTTSVoice(providerId: string, clientVoice?: string): string | undefined {
+  const declared = getConfig().tts[providerId]?.voices?.filter(Boolean) ?? [];
+  if (declared.length === 0) return clientVoice;
+  if (clientVoice && declared.includes(clientVoice)) return clientVoice;
+  return declared[0];
 }

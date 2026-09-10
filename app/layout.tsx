@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { DEFAULT_BRAND } from '@/lib/brand/brand-config';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
@@ -29,7 +30,7 @@ import { ProSwapWatcher } from '@/components/workbench/ProSwapWatcher';
 import '@fontsource-variable/inter';
 
 export const metadata: Metadata = {
-  title: 'OpenMAIC',
+  title: DEFAULT_BRAND.productName,
   description:
     'The open-source AI interactive classroom. Upload a PDF to instantly generate an immersive, multi-agent learning experience.',
 };

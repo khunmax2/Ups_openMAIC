@@ -163,7 +163,7 @@ export function WorkspaceHome({
 
             <div className="mt-3.5 flex items-center gap-3">
               <p className="ws-tagline" data-testid="pro-workspace-hero-tagline">
-                {t('home.slogan')}
+                {brand.tagline}
               </p>
             </div>
           </div>
