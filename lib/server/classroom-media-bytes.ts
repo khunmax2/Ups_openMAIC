@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { CLASSROOMS_DIR } from '@/lib/server/classroom-storage';
+import { apiPath } from '@/lib/base-path';
 
 function extensionForMime(mime: string): string {
   const known: Record<string, string> = {
@@ -49,5 +50,18 @@ export async function persistClassroomMediaBytes(input: {
   if (input.signal?.aborted) throw new Error('aborted');
   await fs.writeFile(path.join(mediaDir, filename), input.bytes);
   if (input.signal?.aborted) throw new Error('aborted');
-  return `/api/classroom-media/${input.stageId}/media/${filename}`;
+  // Prefixed with the base path on the way in, because this string is stored in
+  // the scene document and later handed to the browser as a `src`. The module
+  // comment in lib/server/media-origin.ts calls these references
+  // origin-independent, and they are -- but a base path is not an origin, and a
+  // bare /api/... resolves against the root, which on a shared host is another
+  // team's API rather than a 404.
+  //
+  // Written rather than rendered on purpose. The renderer lives in
+  // @openmaic/renderer, a package published on its own, and teaching it about
+  // this app's base path would point the wrong way. The cost is that a stored
+  // reference now carries the deployment's base path: change it and the stored
+  // rows need one UPDATE. That is recorded in the deploy runbook, and it is
+  // cheap while the database is still empty.
+  return apiPath(`/api/classroom-media/${input.stageId}/media/${filename}`);
 }

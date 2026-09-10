@@ -34,7 +34,7 @@ import type { ImageProviderId, VideoProviderId } from '@/lib/media/types';
 import type { ASRProviderId } from '@/lib/audio/types';
 import { isCustomASRProvider } from '@/lib/audio/types';
 import type { SettingsSection } from '@/lib/types/settings';
-import { apiPath } from '@/lib/base-path';
+import { apiPath, assetPath } from '@/lib/base-path';
 
 interface MediaPopoverProps {
   onSettingsOpen: (section: SettingsSection) => void;
@@ -453,7 +453,11 @@ function GroupedSelect({
       <SelectTrigger className="h-8 w-full rounded-lg border-border/40 bg-background/80 hover:bg-muted/40 shadow-none text-xs focus:ring-1 focus:ring-ring/30 px-2.5">
         <span className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
           {selectedGroup?.groupIcon && (
-            <img src={selectedGroup.groupIcon} alt="" className="size-4 rounded-sm shrink-0" />
+            <img
+              src={assetPath(selectedGroup.groupIcon)}
+              alt=""
+              className="size-4 rounded-sm shrink-0"
+            />
           )}
           <span className="font-medium truncate">{selectedGroup?.groupName}</span>
           <span className="text-muted-foreground/40">/</span>
@@ -470,7 +474,7 @@ function GroupedSelect({
               <SelectLabel className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider">
                 {group.groupIcon && (
                   <img
-                    src={group.groupIcon}
+                    src={assetPath(group.groupIcon)}
                     alt=""
                     className={cn('size-3.5 rounded-sm', !group.available && 'opacity-40')}
                   />

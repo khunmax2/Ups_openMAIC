@@ -48,6 +48,7 @@ import {
 import { dedupeCourseMaterialFiles } from '@/lib/document/course-materials';
 import type { SelectedCourseMaterial } from '@/lib/types/generation';
 import { findModelById, modelIdsMatch } from '@/lib/ai/model-aliases';
+import { assetPath } from '@/lib/base-path';
 
 // ─── Constants ───────────────────────────────────────────────
 const MAX_COURSE_MATERIAL_SIZE_MB = 50;
@@ -314,7 +315,11 @@ export function GenerationToolbar({
                           className={cn('flex items-center gap-1.5', !available && 'opacity-50')}
                         >
                           {provider.icon && (
-                            <img src={provider.icon} alt={provider.name} className="w-3.5 h-3.5" />
+                            <img
+                              src={assetPath(provider.icon)}
+                              alt={provider.name}
+                              className="w-3.5 h-3.5"
+                            />
                           )}
                           {provider.name}
                           {cfg?.isServerConfigured && (
@@ -875,7 +880,7 @@ function ModelSettingsPopover({
             >
               {currentProviderIcon ? (
                 <img
-                  src={currentProviderIcon}
+                  src={assetPath(currentProviderIcon)}
                   alt={currentProviderName}
                   className="size-4 shrink-0 rounded-sm"
                 />
@@ -929,7 +934,7 @@ function ModelSettingsPopover({
                     >
                       {provider.icon ? (
                         <img
-                          src={provider.icon}
+                          src={assetPath(provider.icon)}
                           alt={provider.name}
                           className="size-4 shrink-0 rounded-sm"
                         />

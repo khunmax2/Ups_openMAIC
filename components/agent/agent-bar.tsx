@@ -27,7 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { AgentConfig } from '@/lib/orchestration/registry/types';
 import type { TTSProviderId } from '@/lib/audio/types';
 import type { ProviderWithVoices } from '@/lib/audio/voice-resolver';
-import { apiPath } from '@/lib/base-path';
+import { apiPath, assetPath } from '@/lib/base-path';
 
 function matchesVoiceQuery(value: string | undefined, query: string): boolean {
   return !!value?.toLowerCase().includes(query);
@@ -723,7 +723,7 @@ export function AgentBar() {
       {teacherAgent && (
         <div className="size-8 rounded-full overflow-hidden ring-2 ring-blue-400/40 dark:ring-blue-500/30 shrink-0">
           <img
-            src={teacherAgent.avatar}
+            src={assetPath(teacherAgent.avatar)}
             alt={getAgentName(teacherAgent)}
             className="size-full object-cover"
           />
@@ -736,7 +736,7 @@ export function AgentBar() {
             {agents.find((a) => a.role === 'assistant') && (
               <div className="size-6 rounded-full overflow-hidden ring-[1.5px] ring-background">
                 <img
-                  src={agents.find((a) => a.role === 'assistant')!.avatar}
+                  src={assetPath(agents.find((a) => a.role === 'assistant')!.avatar)}
                   alt=""
                   className="size-full object-cover"
                 />
@@ -755,7 +755,7 @@ export function AgentBar() {
                   className="size-6 rounded-full overflow-hidden ring-[1.5px] ring-background"
                 >
                   <img
-                    src={agent.avatar}
+                    src={assetPath(agent.avatar)}
                     alt={getAgentName(agent)}
                     className="size-full object-cover"
                   />
@@ -802,7 +802,11 @@ export function AgentBar() {
           className="size-7 rounded-full overflow-hidden shrink-0 ring-1 ring-border/40"
           style={{ boxShadow: isSelected ? `0 0 0 2px ${agent.color}30` : undefined }}
         >
-          <img src={agent.avatar} alt={getAgentName(agent)} className="size-full object-cover" />
+          <img
+            src={assetPath(agent.avatar)}
+            alt={getAgentName(agent)}
+            className="size-full object-cover"
+          />
         </div>
         <span className="text-[13px] font-medium truncate min-w-0 flex-1">
           {getAgentName(agent)}
@@ -867,7 +871,7 @@ export function AgentBar() {
                     style={{ boxShadow: `0 0 0 2px ${teacherAgent.color}30` }}
                   >
                     <img
-                      src={teacherAgent.avatar}
+                      src={assetPath(teacherAgent.avatar)}
                       alt={getAgentName(teacherAgent)}
                       className="size-full object-cover"
                     />

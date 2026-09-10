@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { toast } from 'sonner';
 import { useUserProfileStore, AVATAR_OPTIONS } from '@/lib/store/user-profile';
+import { assetPath } from '@/lib/base-path';
 
 /** Check whether avatar is a custom upload (data-URL) */
 function isCustomAvatar(avatar: string) {
@@ -120,7 +121,7 @@ export function UserProfileCard() {
           className="shrink-0 group/avatar relative cursor-pointer"
         >
           <div className="size-11 rounded-full bg-gray-50 dark:bg-gray-800 overflow-hidden ring-2 ring-violet-300/50 dark:ring-violet-600/40 group-hover/avatar:ring-violet-400 dark:group-hover/avatar:ring-violet-500 transition-all">
-            <img src={avatar} alt="" className="size-full object-cover" />
+            <img src={assetPath(avatar)} alt="" className="size-full object-cover" />
           </div>
           <div className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-white dark:bg-slate-800 border border-muted/60 flex items-center justify-center">
             <ChevronDown
@@ -193,7 +194,7 @@ export function UserProfileCard() {
                       : 'hover:ring-1 hover:ring-muted-foreground/30',
                   )}
                 >
-                  <img src={url} alt="" className="size-full" />
+                  <img src={assetPath(url)} alt="" className="size-full" />
                 </button>
               ))}
 

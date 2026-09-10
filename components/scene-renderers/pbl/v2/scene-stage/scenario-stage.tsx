@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils/cn';
 import { PBL_SIMULATOR_AGENT_ID } from '@/lib/pbl/v2/operations/kernel/progress';
 import { SceneBackdrop } from './scene-backdrop';
 import { sanitizeSceneVisual } from './scene-types';
+import { assetPath } from '@/lib/base-path';
 
 interface Props {
   readonly project: PBLProjectV2;
@@ -251,7 +252,13 @@ function CharacterAvatar({
   const isImg = typeof avatar === 'string' && avatar.startsWith('/');
   if (compact) {
     return isImg ? (
-      <Image src={avatar} alt="" width={28} height={28} className="h-7 w-7 object-cover" />
+      <Image
+        src={assetPath(avatar)}
+        alt=""
+        width={28}
+        height={28}
+        className="h-7 w-7 object-cover"
+      />
     ) : (
       <span>{initial}</span>
     );
@@ -262,7 +269,13 @@ function CharacterAvatar({
       style={{ borderColor: 'rgba(255,255,255,0.7)', background: accent ?? '#9d8cff' }}
     >
       {isImg ? (
-        <Image src={avatar} alt="" width={48} height={48} className="h-12 w-12 object-cover" />
+        <Image
+          src={assetPath(avatar)}
+          alt=""
+          width={48}
+          height={48}
+          className="h-12 w-12 object-cover"
+        />
       ) : (
         initial
       )}
