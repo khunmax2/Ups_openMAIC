@@ -32,7 +32,7 @@ import { useI18n } from '@/lib/hooks/use-i18n';
 import type { CSSProperties } from 'react';
 import { runOneStream, type StreamDisplayState, type StreamStatus } from './use-instructor-stream';
 import type { PBLProjectPatch } from '@/lib/pbl/v2/api/sse';
-import { apiPath } from '@/lib/base-path';
+import { apiPath, assetPath } from '@/lib/base-path';
 
 interface Props {
   readonly project: PBLProjectV2;
@@ -443,7 +443,7 @@ function WorkspaceTopBar({
       <div className="relative flex min-w-0 flex-1 items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-200/25 bg-violet-100/[0.08] shadow-[0_0_24px_rgba(157,140,255,0.18)]">
           <Image
-            src="/openmaic-mark.png"
+            src={assetPath('/openmaic-mark.png')}
             alt="OpenMAIC"
             width={28}
             height={28}
