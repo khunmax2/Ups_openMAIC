@@ -13,6 +13,11 @@ import type { NextRequest } from 'next/server';
 import { isAgentRuntimeConfigured } from '@/lib/config/feature-flags';
 import { subscribeAgentEventWakeup } from '@/lib/server/agent-runtime/event-notify-bus';
 import { resolveRequestOwnerId } from '@/lib/server/agent-runtime/owner';
+import {
+  readStudioOwnerId,
+  refuseWithoutStudioIdentity,
+  studioGatewayRequired,
+} from '@/lib/server/studio-identity';
 import { getAgentSessionStore } from '@/lib/server/agent-runtime/store';
 
 export const runtime = 'nodejs';
@@ -41,12 +46,15 @@ export async function GET(req: NextRequest) {
 
   // Identity belongs to the request, not the URL. EventSource reconnects to
   // this same stable path with the anonymous cookie minted on first attach.
-  // This slice resolves only the anonymous cookie identity; a future auth
-  // integration must thread `authenticatedOwnerId` through here, or sessions
-  // created under authenticated identities would be unreachable by their own
-  // owner.
+  // The identity the gateway verified is threaded through `authenticatedOwnerId`
+  // here, exactly as upstream's docstring asks; without it a session created
+  // under an authenticated identity would be unreachable by its own owner.
   const responseHeaders = new Headers();
-  const ownerId = resolveRequestOwnerId(req, responseHeaders);
+  const studioOwnerId = readStudioOwnerId(req.headers);
+  if (!studioOwnerId && studioGatewayRequired()) {
+    return refuseWithoutStudioIdentity(responseHeaders);
+  }
+  const ownerId = resolveRequestOwnerId(req, responseHeaders, studioOwnerId);
   const store = await getAgentSessionStore();
 
   const url = new URL(req.url);

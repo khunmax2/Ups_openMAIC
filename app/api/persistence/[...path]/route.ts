@@ -16,6 +16,7 @@ import {
 } from '@/lib/persistence/document-access';
 import { createOwnerBoundDocumentStore } from '@/lib/persistence/owner-bound-document-store';
 import { authenticatePersistenceRequest } from '@/lib/persistence/server-auth';
+import { readStudioOwnerId, studioGatewayRequired } from '@/lib/server/studio-identity';
 import {
   getServerPersistenceProvider,
   type PersistencePoolFactory,
@@ -272,12 +273,14 @@ export async function handlePersistenceRequest(
   if (!connectionString) {
     return jsonError(404, 'PERSISTENCE_NOT_CONFIGURED', 'server persistence not configured');
   }
-  if (!process.env.PERSISTENCE_DEV_TOKEN) {
-    return jsonError(
-      503,
-      'PERSISTENCE_DEV_TOKEN_MISSING',
-      'server persistence requires PERSISTENCE_DEV_TOKEN (development auth only)',
-    );
+
+  // Refuse before touching the database. Upstream's PERSISTENCE_DEV_TOKEN gate
+  // used to stand here and did the same job by accident; removing it without
+  // putting this in its place would let an unauthenticated request open a
+  // connection pool on its way to being rejected — one round trip per request
+  // for anything that can reach the route.
+  if (studioGatewayRequired() && !readStudioOwnerId(request.headers)) {
+    return jsonError(401, 'UNAUTHENTICATED', 'no verified identity on this request');
   }
 
   return withRequestOwnerId(request, async (ownerId, responseHeaders) => {

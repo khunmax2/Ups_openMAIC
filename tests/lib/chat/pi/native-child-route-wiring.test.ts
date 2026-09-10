@@ -49,6 +49,10 @@ const envNames = [
 ] as const;
 const originalEnv = new Map<string, string | undefined>();
 
+// The learner partition is the owner the gateway verified. There is no second
+// credential any more: an identity header is the whole of the authentication.
+const OWNER = 'user:learner-route-test';
+
 function finish(finishReason: string) {
   return { type: 'finish', finishReason, totalUsage: ZERO_USAGE };
 }
@@ -68,10 +72,7 @@ function resultFrom(parts: Array<Record<string, unknown>>) {
 
 function makeRequest(
   overrides: Record<string, unknown> = {},
-  headers: Record<string, string> = {
-    authorization: 'Bearer persistence-test-token',
-    'x-learner-key': 'learner-route-test',
-  },
+  headers: Record<string, string> = { 'x-deeptutor-owner': OWNER },
 ): NextRequest {
   return new Request('http://localhost/api/chat/pi', {
     method: 'POST',
@@ -269,7 +270,6 @@ describe('PR2 Native Child route production wiring', () => {
   it('wires RuntimeStore WB inventory through the real route and completes an action-only Child', async () => {
     process.env.NEXT_PUBLIC_PERSISTENCE = '1';
     process.env.DATABASE_URL = 'postgres://shared-provider-test';
-    process.env.PERSISTENCE_DEV_TOKEN = 'persistence-test-token';
     const directorResponses = [
       [toolCall('read-1', 'read_scene', { sceneId: 'scene-current' }), finish('tool-calls')],
       [
@@ -397,7 +397,7 @@ describe('PR2 Native Child route production wiring', () => {
     });
 
     const provider = await mocks.getServerPersistenceProvider.mock.results[0]?.value;
-    const sessions = await provider.runtimeStore.listSessions('stage-1', 'learner-route-test');
+    const sessions = await provider.runtimeStore.listSessions('stage-1', OWNER);
     expect(sessions).toHaveLength(1);
     const records: RuntimeRecord[] = await provider.runtimeStore.listRecords(sessions[0]!.id);
     expect(records).toHaveLength(1);
@@ -407,7 +407,6 @@ describe('PR2 Native Child route production wiring', () => {
   it('executes wb_draw_text → wb_delete through the production route in one Child', async () => {
     process.env.NEXT_PUBLIC_PERSISTENCE = '1';
     process.env.DATABASE_URL = 'postgres://shared-provider-test';
-    process.env.PERSISTENCE_DEV_TOKEN = 'persistence-test-token';
     const directorResponses = [
       [toolCall('read-1', 'read_scene', { sceneId: 'scene-current' }), finish('tool-calls')],
       [
@@ -508,7 +507,7 @@ describe('PR2 Native Child route production wiring', () => {
     });
 
     const provider = await mocks.getServerPersistenceProvider.mock.results[0]?.value;
-    const sessions = await provider.runtimeStore.listSessions('stage-1', 'learner-route-test');
+    const sessions = await provider.runtimeStore.listSessions('stage-1', OWNER);
     expect(sessions).toHaveLength(1);
     const records: RuntimeRecord[] = await provider.runtimeStore.listRecords(sessions[0]!.id);
     expect(records.map((record) => record.seq)).toEqual([0, 1]);
@@ -581,13 +580,12 @@ describe('PR2 Native Child route production wiring', () => {
               ],
             },
           },
-          { authorization: 'Bearer persistence-test-token' },
+          {},
         ),
     },
   ])('keeps the Native WB bundle absent for $name', async ({ request }) => {
     process.env.NEXT_PUBLIC_PERSISTENCE = '1';
     process.env.DATABASE_URL = 'postgres://shared-provider-test';
-    process.env.PERSISTENCE_DEV_TOKEN = 'persistence-test-token';
     const directorResponses = [
       [toolCall('read-1', 'read_scene', { sceneId: 'scene-current' }), finish('tool-calls')],
       [
@@ -624,7 +622,6 @@ describe('PR2 Native Child route production wiring', () => {
   it('keeps Pi chat available without WB inventory when persistence initialization fails', async () => {
     process.env.NEXT_PUBLIC_PERSISTENCE = '1';
     process.env.DATABASE_URL = 'postgres://unavailable-provider-test';
-    process.env.PERSISTENCE_DEV_TOKEN = 'persistence-test-token';
     mocks.getServerPersistenceProvider.mockRejectedValue(new Error('pool unavailable'));
     const directorResponses = [
       [toolCall('read-1', 'read_scene', { sceneId: 'scene-current' }), finish('tool-calls')],

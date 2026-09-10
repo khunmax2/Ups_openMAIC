@@ -1,7 +1,8 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { getAgentSessionStore } from '@/lib/server/agent-runtime/store';
+import { readStudioOwnerId } from '@/lib/server/studio-identity';
 
 /**
  * The anonymous identity cookie minted by the agent-runtime owner resolution
@@ -15,6 +16,15 @@ const ANONYMOUS_COOKIE = 'anonymous_id';
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 async function currentOwnerId(): Promise<string> {
+  // Fork change: the gateway's verified identity wins, the same way it does on
+  // every route. A Server Action has no `Request`, but `headers()` reads the
+  // same incoming headers, so this stays the one identity the rest of the app
+  // sees. Without it a signed-in visitor could list their sessions through a
+  // route and then fail to delete one through this action, because the two
+  // would be looking at different owners.
+  const studioOwnerId = readStudioOwnerId(await headers());
+  if (studioOwnerId) return studioOwnerId;
+
   const cookieStore = await cookies();
   const existing = cookieStore.get(ANONYMOUS_COOKIE)?.value;
   if (existing && UUID_V4.test(existing)) return `anon:${existing}`;
