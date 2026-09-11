@@ -61,9 +61,7 @@ export interface MaskedCredential {
 
 export type MaskedSet = Partial<Record<CredentialSection, Record<string, MaskedCredential>>>;
 
-function maskSet(
-  rows: CredentialSet['own'] | CredentialSet['defaults'],
-): MaskedSet {
+function maskSet(rows: CredentialSet['own'] | CredentialSet['defaults']): MaskedSet {
   const out: MaskedSet = {};
   for (const [section, providers] of Object.entries(rows) as Array<
     [CredentialSection, Record<string, StoredCredential>]
@@ -90,7 +88,12 @@ export async function handleList(request: Request): Promise<Response> {
     return json(200, { role, storage: 'none', own: {}, defaults: {} });
   }
   const set = await listCredentials(store, owner);
-  return json(200, { role, storage: 'server', own: maskSet(set.own), defaults: maskSet(set.defaults) });
+  return json(200, {
+    role,
+    storage: 'server',
+    own: maskSet(set.own),
+    defaults: maskSet(set.defaults),
+  });
 }
 
 interface Address {

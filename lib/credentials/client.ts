@@ -24,7 +24,14 @@ import { useSettingsStore, type SettingsState } from '@/lib/store/settings';
 
 export const CREDENTIAL_SENTINEL = '***';
 
-export type CredentialSection = 'providers' | 'tts' | 'asr' | 'pdf' | 'image' | 'video' | 'webSearch';
+export type CredentialSection =
+  | 'providers'
+  | 'tts'
+  | 'asr'
+  | 'pdf'
+  | 'image'
+  | 'video'
+  | 'webSearch';
 
 export const CREDENTIAL_SECTIONS: readonly CredentialSection[] = [
   'providers',
@@ -94,7 +101,8 @@ export async function putCredential(
   patch: CredentialPatch,
   scope: 'owner' | 'default' = 'owner',
 ): Promise<{ masked: string; baseUrl: string } | null | undefined> {
-  const path = scope === 'default' ? `/default/${section}/${providerId}` : `/${section}/${providerId}`;
+  const path =
+    scope === 'default' ? `/default/${section}/${providerId}` : `/${section}/${providerId}`;
   try {
     const res = await fetch(apiPath(`/api/studio/credentials${path}`), {
       method: 'PUT',
@@ -114,7 +122,8 @@ export async function removeCredential(
   providerId: string,
   scope: 'owner' | 'default' = 'owner',
 ): Promise<boolean> {
-  const path = scope === 'default' ? `/default/${section}/${providerId}` : `/${section}/${providerId}`;
+  const path =
+    scope === 'default' ? `/default/${section}/${providerId}` : `/${section}/${providerId}`;
   try {
     const res = await fetch(apiPath(`/api/studio/credentials${path}`), {
       method: 'DELETE',
@@ -262,7 +271,10 @@ function watchStore() {
                   ? { apiKey: stored ? CREDENTIAL_SENTINEL : '' }
                   : {}),
               };
-              return { credentialMeta: meta, [STORE_KEY[section]]: entries } as Partial<SettingsState>;
+              return {
+                credentialMeta: meta,
+                [STORE_KEY[section]]: entries,
+              } as Partial<SettingsState>;
             });
           }, 800),
         );

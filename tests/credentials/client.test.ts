@@ -66,9 +66,8 @@ describe('server-side credentials, browser half', () => {
       defaults: { tts: { 'openai-tts': { masked: 'sk-de••••zzzz', baseUrl: '' } } },
     });
     const { useSettingsStore } = await import('@/lib/store/settings');
-    const { startCredentialSync, resetCredentialSyncForTests } = await import(
-      '@/lib/credentials/client'
-    );
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
     resetCredentialSyncForTests();
     await startCredentialSync();
 
@@ -94,9 +93,8 @@ describe('server-side credentials, browser half', () => {
       apiKey: 'old-browser-key-000000',
       baseUrl: '',
     });
-    const { startCredentialSync, resetCredentialSyncForTests } = await import(
-      '@/lib/credentials/client'
-    );
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
     resetCredentialSyncForTests();
     await startCredentialSync();
 
@@ -112,9 +110,8 @@ describe('server-side credentials, browser half', () => {
     vi.useFakeTimers();
     const { calls } = fakeServer({});
     const { useSettingsStore } = await import('@/lib/store/settings');
-    const { startCredentialSync, resetCredentialSyncForTests } = await import(
-      '@/lib/credentials/client'
-    );
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
     resetCredentialSyncForTests();
     await startCredentialSync();
 
@@ -135,9 +132,8 @@ describe('server-side credentials, browser half', () => {
       own: { image: { 'custom-image': { masked: 'sk••••', baseUrl: '' } } },
     });
     const { useSettingsStore } = await import('@/lib/store/settings');
-    const { startCredentialSync, resetCredentialSyncForTests } = await import(
-      '@/lib/credentials/client'
-    );
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
     resetCredentialSyncForTests();
     await startCredentialSync();
 
@@ -152,9 +148,8 @@ describe('server-side credentials, browser half', () => {
     const { calls } = fakeServer({ storage: 'none' });
     const { useSettingsStore } = await import('@/lib/store/settings');
     useSettingsStore.getState().setImageProviderConfig('custom-image', { apiKey: 'local-key' });
-    const { startCredentialSync, resetCredentialSyncForTests } = await import(
-      '@/lib/credentials/client'
-    );
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
     resetCredentialSyncForTests();
     await startCredentialSync();
     expect(useSettingsStore.getState().credentialStorage).toBe('none');
@@ -167,9 +162,8 @@ describe('server-side credentials, browser half', () => {
   it('never persists a real key once the server holds them', async () => {
     fakeServer({});
     const { useSettingsStore } = await import('@/lib/store/settings');
-    const { startCredentialSync, resetCredentialSyncForTests } = await import(
-      '@/lib/credentials/client'
-    );
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
     resetCredentialSyncForTests();
     await startCredentialSync();
     // In memory for the moment between keystroke and confirmation...
@@ -179,8 +173,10 @@ describe('server-side credentials, browser half', () => {
         'custom-image': { ...s.imageProvidersConfig['custom-image'], apiKey: 'in-flight-key' },
       },
     }));
-    const persisted = useSettingsStore.persist.getOptions().partialize?.(useSettingsStore.getState());
-    expect(persisted?.imageProvidersConfig['custom-image']?.apiKey).toBe('***');
+    const persisted = useSettingsStore.persist
+      .getOptions()
+      .partialize?.(useSettingsStore.getState());
+    expect(persisted?.imageProvidersConfig?.['custom-image']?.apiKey).toBe('***');
     expect(JSON.stringify(persisted)).not.toContain('in-flight-key');
   });
 });

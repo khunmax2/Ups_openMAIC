@@ -110,7 +110,10 @@ function fold(rows: Row[], ownerId: string): CredentialSet {
 }
 
 /** One query: the owner's rows and every default row. */
-export async function listCredentials(queryable: Queryable, ownerId: string): Promise<CredentialSet> {
+export async function listCredentials(
+  queryable: Queryable,
+  ownerId: string,
+): Promise<CredentialSet> {
   const result = await queryable.query<Row>(
     `SELECT scope, owner_id, section, provider_id, api_key, base_url
        FROM studio_credential
@@ -197,7 +200,10 @@ export async function deleteCredential(
 }
 
 /** Everything an owner stored, for account deletion. Defaults are not theirs. */
-export async function deleteOwnerCredentials(queryable: Queryable, ownerId: string): Promise<number> {
+export async function deleteOwnerCredentials(
+  queryable: Queryable,
+  ownerId: string,
+): Promise<number> {
   const result = await queryable.query(
     `DELETE FROM studio_credential WHERE scope = 'owner' AND owner_id = $1 RETURNING provider_id`,
     [ownerId],

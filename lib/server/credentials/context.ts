@@ -125,7 +125,11 @@ export async function runWithCredentials<T>(
  * credential context. A request with no identity at all runs the handler as
  * upstream would: nothing loaded, client key only.
  */
-export function withOwnerCredentials<Req extends Request, Res extends Response, Args extends unknown[]>(
+export function withOwnerCredentials<
+  Req extends Request,
+  Res extends Response,
+  Args extends unknown[],
+>(
   handler: (request: Req, ...rest: Args) => Promise<Res>,
 ): (request: Req, ...rest: Args) => Promise<Res> {
   return async (request, ...rest) => {
