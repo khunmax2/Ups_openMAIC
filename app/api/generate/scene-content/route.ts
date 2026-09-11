@@ -33,6 +33,7 @@ import {
   type VisionPromptImage,
 } from '@/lib/persistence/resolve-vision-images';
 import { generatePBLV2Project } from '@/lib/pbl/v2/agents/planner';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('Scene Content API');
 
@@ -56,7 +57,7 @@ const VISION_RESOLUTION_BUDGET_MS = 15_000;
  */
 const MAX_CONSECUTIVE_UNRESOLVABLE_VISION_IMAGES = 3;
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let outlineTitle: string | undefined;
   let resolvedModelString: string | undefined;
   try {
@@ -361,3 +362,7 @@ export async function POST(req: NextRequest) {
     return llmApiError(error);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

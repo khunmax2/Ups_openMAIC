@@ -23,6 +23,7 @@ import { createSSEResponse } from '@/lib/pbl/v2/api/sse';
 import { applyRequestLocaleToProject } from '@/lib/pbl/v2/api/locale';
 import { runSimulatorTurn, type SimulatorPhase } from '@/lib/pbl/v2/agents/simulator';
 import type { PBLProjectV2 } from '@/lib/pbl/v2/types';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 export const maxDuration = 300;
 
@@ -36,7 +37,7 @@ interface SimulatorRequest {
   phase?: SimulatorPhase;
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let body: SimulatorRequest;
   try {
     body = (await req.json()) as SimulatorRequest;
@@ -72,3 +73,7 @@ export async function POST(req: NextRequest) {
     { signal: req.signal },
   );
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

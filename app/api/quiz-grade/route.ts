@@ -10,6 +10,7 @@ import { callLLM } from '@/lib/ai/llm';
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { resolveModelFromRequest } from '@/lib/server/resolve-model';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 const log = createLogger('Quiz Grade');
 
 interface GradeRequest {
@@ -25,7 +26,7 @@ interface GradeResponse {
   comment: string;
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let questionSnippet: string | undefined;
   let resolvedPoints: number | undefined;
   try {
@@ -111,3 +112,7 @@ ${commentPrompt ? `Grading guidance: ${commentPrompt}\n` : ''}Student answer: ${
     return apiError('INTERNAL_ERROR', 500, 'Failed to grade answer');
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

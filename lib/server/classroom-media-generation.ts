@@ -16,8 +16,8 @@ import { DEFAULT_TTS_VOICES, DEFAULT_TTS_MODELS, TTS_PROVIDERS } from '@/lib/aud
 import { IMAGE_PROVIDERS } from '@/lib/media/image-providers';
 import { VIDEO_PROVIDERS } from '@/lib/media/video-providers';
 import {
-  getServerImageProviders,
-  getServerVideoProviders,
+  getUsableImageProviderIds,
+  getUsableVideoProviderIds,
   getServerTTSProviders,
   resolveImageApiKey,
   resolveImageBaseUrl,
@@ -96,12 +96,9 @@ export async function generateMediaForClassroom(
 
   // Resolve providers, excluding operator force-disabled ones (server
   // precedence, #665 — mirror the TTS listing's disabled flag).
-  const imageProviderIds = Object.entries(getServerImageProviders())
-    .filter(([, info]) => !info.disabled)
-    .map(([id]) => id);
-  const videoProviderIds = Object.entries(getServerVideoProviders())
-    .filter(([, info]) => !info.disabled)
-    .map(([id]) => id);
+  // Fork: the owner's stored credentials count as configured providers here.
+  const imageProviderIds = getUsableImageProviderIds();
+  const videoProviderIds = getUsableVideoProviderIds();
 
   const mediaMap: Record<string, string> = {};
 

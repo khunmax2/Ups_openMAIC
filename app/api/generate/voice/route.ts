@@ -33,6 +33,7 @@ import {
 } from '@/lib/audio/voice-registration';
 import { QwenVoiceCloneError, qwenVoiceCloneErrorMessage } from '@/lib/audio/qwen-voice-clone';
 import { InvalidReferenceAudioError } from '@/lib/audio/wav-validate';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('Voice Registration API');
 
@@ -61,7 +62,7 @@ function childSignal(
   };
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let providerId: string | undefined;
   let voiceId: string | undefined;
   const deadline = new AbortController();
@@ -253,3 +254,7 @@ export async function POST(req: NextRequest) {
     req.signal.removeEventListener('abort', abortFromRequest);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

@@ -31,12 +31,13 @@ import type { VideoProviderId, VideoGenerationOptions } from '@/lib/media/types'
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('VideoGeneration API');
 
 export const maxDuration = 300;
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const body = (await request.json()) as VideoGenerationOptions;
 
@@ -128,3 +129,7 @@ export async function POST(request: NextRequest) {
     return apiError('INTERNAL_ERROR', 500, message);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

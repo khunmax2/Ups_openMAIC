@@ -39,6 +39,7 @@ import {
   runTaskEvaluation,
 } from '@/lib/pbl/v2/agents/evaluator';
 import type { PBLProjectV2 } from '@/lib/pbl/v2/types';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 export const maxDuration = 300;
 
@@ -54,7 +55,7 @@ interface EvaluateRequest {
   recentChatSummary?: string;
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let body: EvaluateRequest;
   try {
     body = (await req.json()) as EvaluateRequest;
@@ -129,3 +130,7 @@ export async function POST(req: NextRequest) {
     { signal: req.signal },
   );
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

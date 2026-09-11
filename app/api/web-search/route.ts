@@ -26,10 +26,11 @@ import type { AICallFn } from '@openmaic/generation';
 import { WEB_SEARCH_PROVIDERS } from '@/lib/web-search/constants';
 import type { BaiduSubSources, WebSearchProviderId } from '@/lib/web-search/types';
 import { resolveWebSearchRouteBaseUrl } from '@/lib/server/web-search-config';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('WebSearch');
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let query: string | undefined;
   try {
     const body = await req.json();
@@ -216,3 +217,7 @@ function getWebSearchEnvKey(providerId: WebSearchProviderId): string {
       return 'TAVILY_API_KEY';
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

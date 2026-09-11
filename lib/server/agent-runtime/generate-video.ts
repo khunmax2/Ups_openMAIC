@@ -16,6 +16,7 @@ import type {
 import {
   enabledProviderIds,
   getServerVideoProviders,
+  getUsableVideoProviders,
   isServerProviderDisabled,
   resolveVideoApiKey,
   resolveVideoBaseUrl,
@@ -252,7 +253,7 @@ function defaultResolveVideoProviderConfig(providerId: VideoProviderId): VideoGe
 
 /** Capability gate used before the tool enters a session's registered toolset. */
 export function hasConfiguredVideoGeneration(deps: Partial<GenerateVideoToolDeps> = {}): boolean {
-  const getConfigured = deps.getConfiguredVideoProviders ?? getServerVideoProviders;
+  const getConfigured = deps.getConfiguredVideoProviders ?? getUsableVideoProviders;
   const resolveConfig = deps.resolveVideoProviderConfig ?? defaultResolveVideoProviderConfig;
   return configuredProviderIds(getConfigured()).some((providerId) => {
     const provider = VIDEO_PROVIDERS[providerId];
@@ -492,7 +493,7 @@ async function runVideoGenerationJob(input: VideoJobInput): Promise<void> {
 export function buildGenerateVideoTool(
   deps: GenerateVideoToolDeps,
 ): AgentTool<typeof GenerateVideoParams, unknown> {
-  const getConfigured = deps.getConfiguredVideoProviders ?? getServerVideoProviders;
+  const getConfigured = deps.getConfiguredVideoProviders ?? getUsableVideoProviders;
   const resolveConfig = deps.resolveVideoProviderConfig ?? defaultResolveVideoProviderConfig;
   const callProvider = deps.generateConfiguredVideo ?? generateVideo;
   const persist = deps.persistGeneratedVideo ?? defaultPersistGeneratedVideo;

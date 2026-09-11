@@ -124,6 +124,7 @@ export function PDFSettings({ selectedProviderId }: PDFSettingsProps) {
                 <div className="flex gap-2">
                   <ApiKeyField
                     name={`pdf-api-key-${selectedProviderId}`}
+                    credential={{ section: 'pdf', providerId: selectedProviderId }}
                     placeholder={t('settings.mineruCloudApiKeyPlaceholder')}
                     value={providerConfig?.apiKey || ''}
                     onChange={(v) => setPDFProviderConfig(selectedProviderId, { apiKey: v })}
@@ -262,6 +263,7 @@ export function PDFSettings({ selectedProviderId }: PDFSettingsProps) {
                 </Label>
                 <ApiKeyField
                   name={`pdf-api-key-${selectedProviderId}`}
+                  credential={{ section: 'pdf', providerId: selectedProviderId }}
                   placeholder={t('settings.enterApiKey')}
                   value={providerConfig?.apiKey || ''}
                   onChange={(v) => setPDFProviderConfig(selectedProviderId, { apiKey: v })}

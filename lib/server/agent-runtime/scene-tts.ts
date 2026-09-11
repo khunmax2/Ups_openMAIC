@@ -5,7 +5,7 @@ import { BROWSER_NATIVE_TTS_PROVIDER_ID } from '@/lib/audio/provider-enablement'
 import type { LegacySpeechAction, SpeechAction } from '@/lib/types/action';
 import type { GeneratedAgentConfig, Scene } from '@/lib/types/stage';
 import {
-  getServerTTSProviders,
+  getUsableTTSProviders,
   resolveTTSApiKey,
   resolveTTSBaseUrl,
   resolveTTSModel,
@@ -28,7 +28,7 @@ export interface SceneTtsInput {
 }
 
 function enabledProviderIds(): TTSProviderId[] {
-  return Object.entries(getServerTTSProviders())
+  return Object.entries(getUsableTTSProviders())
     .filter(([id, config]) => id !== BROWSER_NATIVE_TTS_PROVIDER_ID && !config.disabled)
     .map(([id]) => id as TTSProviderId);
 }

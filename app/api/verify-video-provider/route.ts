@@ -28,10 +28,11 @@ import type { VideoProviderId } from '@/lib/media/types';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { createLogger } from '@/lib/logger';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('VerifyVideoProvider');
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const providerId = (request.headers.get('x-video-provider')?.trim() ||
       resolveServerVideoProviderId()) as VideoProviderId;
@@ -89,3 +90,7 @@ export async function POST(request: NextRequest) {
     return apiError('INTERNAL_ERROR', 500, `Connectivity test error: ${err}`);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

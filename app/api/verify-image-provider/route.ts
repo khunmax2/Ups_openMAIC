@@ -28,6 +28,7 @@ import type { ImageProviderId } from '@/lib/media/types';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { createLogger } from '@/lib/logger';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('VerifyImageProvider');
 
@@ -36,7 +37,7 @@ const log = createLogger('VerifyImageProvider');
 // upstream can't tie up the function indefinitely.
 export const maxDuration = 30;
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const providerId = (request.headers.get('x-image-provider')?.trim() ||
       resolveServerImageProviderId()) as ImageProviderId;
@@ -97,3 +98,7 @@ export async function POST(request: NextRequest) {
     return apiError('INTERNAL_ERROR', 500, `Connectivity test error: ${err}`);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

@@ -6,6 +6,9 @@ import { runClassroomGenerationJob } from '@/lib/server/classroom-job-runner';
 import { createClassroomGenerationJob } from '@/lib/server/classroom-job-store';
 import { buildRequestOrigin } from '@/lib/server/classroom-storage';
 import { createLogger } from '@/lib/logger';
+import { readAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
+import { runWithCredentials } from '@/lib/server/credentials/context';
+import { readStudioOwnerId, readStudioRole } from '@/lib/server/studio-identity';
 
 const log = createLogger('GenerateClassroom API');
 
@@ -45,7 +48,15 @@ export async function POST(req: NextRequest) {
     const job = await createClassroomGenerationJob(jobId, body);
     const pollUrl = `${baseUrl}/api/generate-classroom/${jobId}`;
 
-    after(() => runClassroomGenerationJob(jobId, body, baseUrl));
+    // Fork: `after()` runs once the response is sent, outside the request's
+    // credential context, so the owner is carried into the job by hand.
+    const ownerId = readStudioOwnerId(req.headers) ?? readAnonymousOwnerId(req.headers);
+    const role = readStudioRole(req.headers);
+    after(() =>
+      ownerId
+        ? runWithCredentials(ownerId, role, () => runClassroomGenerationJob(jobId, body, baseUrl))
+        : runClassroomGenerationJob(jobId, body, baseUrl),
+    );
 
     return apiSuccess(
       {

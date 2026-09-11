@@ -3,9 +3,10 @@ import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { resolveModel } from '@/lib/server/resolve-model';
 import { callLLM } from '@/lib/ai/llm';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 const log = createLogger('Verify Model');
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let model: string | undefined;
   try {
     const body = await req.json();
@@ -75,3 +76,7 @@ export async function POST(req: NextRequest) {
     return apiError('INTERNAL_ERROR', 500, errorMessage);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

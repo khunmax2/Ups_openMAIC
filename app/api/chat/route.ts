@@ -20,6 +20,7 @@ import { apiError } from '@/lib/server/api-response';
 import { createLogger } from '@/lib/logger';
 import { resolveModel } from '@/lib/server/resolve-model';
 import type { ThinkingConfig } from '@/lib/types/provider';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 const log = createLogger('Chat API');
 
 // Allow streaming responses up to 60 seconds
@@ -41,7 +42,7 @@ export const maxDuration = 60;
  *
  * Response: SSE stream of StatelessEvent
  */
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const encoder = new TextEncoder();
   let chatModel: string | undefined;
   let chatMessageCount: number | undefined;
@@ -205,3 +206,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

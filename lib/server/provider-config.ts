@@ -10,6 +10,12 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { createLogger } from '@/lib/logger';
 import {
+  currentCredential,
+  currentCredentialProviderIds,
+  isCredentialSentinel,
+} from '@/lib/server/credentials/context';
+import type { CredentialSection } from '@/lib/server/credentials/store';
+import {
   DEFAULT_QWEN_TTS_VOICE_CLONE_MODEL,
   isQwenCatalogVoice,
   isQwenVoiceCloneModel,
@@ -619,6 +625,10 @@ export function enabledProviderIds<T extends { disabled?: boolean }>(
   return Object.keys(listing).filter((id) => !listing[id]?.disabled);
 }
 
+// Fork. Between the operator's entry and the client's value sit the rows the
+// owner (or an admin, as a default) stored server-side -- see
+// lib/server/credentials/context.ts for the precedence and why it is there.
+// A client that no longer holds a key sends the sentinel; it is never a key.
 function resolveSectionApiKey(
   section: ProviderSection,
   providerId: string,
@@ -626,6 +636,9 @@ function resolveSectionApiKey(
 ): string {
   const entry = getConfig()[section][providerId];
   if (entry) return entry.apiKey || ''; // managed: server key is authoritative
+  const stored = currentCredential(section, providerId);
+  if (stored?.apiKey) return stored.apiKey;
+  if (isCredentialSentinel(clientKey)) return '';
   return clientKey || ''; // unmanaged: client-supplied key only
 }
 
@@ -636,7 +649,68 @@ function resolveSectionBaseUrl(
 ): string | undefined {
   const entry = getConfig()[section][providerId];
   if (entry) return entry.baseUrl; // managed: server base URL is authoritative
+  const stored = currentCredential(section, providerId);
+  if (stored?.baseUrl) return stored.baseUrl;
   return clientBaseUrl; // unmanaged: client-supplied base URL only
+}
+
+/**
+ * Fork. The providers a server-side job may use on the current owner's
+ * behalf: the operator's listing plus whatever the owner (or the admin
+ * default) stored a credential for, own rows first. Distinct from the
+ * `getServer*Providers()` listings on purpose: those also feed the browser's
+ * "managed by the server" display, and an owner's own key is not that.
+ */
+function usableProviderIds(
+  section: ProviderSection,
+  listed: Record<string, { disabled?: boolean }>,
+): string[] {
+  const disabled = getConfig().disabled[section as CapabilitySection] ?? new Set<string>();
+  const fromListing = Object.entries(listed)
+    .filter(([, info]) => !info.disabled)
+    .map(([id]) => id);
+  const fromContext = currentCredentialProviderIds(section as CredentialSection).filter(
+    (id) => !disabled.has(id) && !fromListing.includes(id),
+  );
+  return [...fromContext, ...fromListing];
+}
+
+export function getUsableImageProviderIds(): string[] {
+  return usableProviderIds('image', getServerImageProviders());
+}
+
+export function getUsableVideoProviderIds(): string[] {
+  return usableProviderIds('video', getServerVideoProviders());
+}
+
+export function getUsableTTSProviderIds(): string[] {
+  return usableProviderIds('tts', getServerTTSProviders());
+}
+
+/**
+ * The same, in the listing shape the agent-runtime tools take as an injected
+ * dependency, so they can be handed this in place of the operator listing
+ * without changing how they select.
+ */
+function usableListing<T extends { disabled?: boolean }>(
+  section: ProviderSection,
+  listed: Record<string, T>,
+): Record<string, T | Record<string, never>> {
+  const out: Record<string, T | Record<string, never>> = { ...listed };
+  for (const id of usableProviderIds(section, listed)) out[id] ??= {};
+  return out;
+}
+
+export function getUsableImageProviders(): ReturnType<typeof getServerImageProviders> {
+  return usableListing('image', getServerImageProviders());
+}
+
+export function getUsableVideoProviders(): ReturnType<typeof getServerVideoProviders> {
+  return usableListing('video', getServerVideoProviders());
+}
+
+export function getUsableTTSProviders(): ReturnType<typeof getServerTTSProviders> {
+  return usableListing('tts', getServerTTSProviders());
 }
 
 // ---------------------------------------------------------------------------

@@ -82,6 +82,7 @@ export function WebSearchSettings({ selectedProviderId }: WebSearchSettingsProps
             <div className="space-y-2">
               <Label className="text-sm">{t('settings.webSearchApiKey')}</Label>
               <ApiKeyField
+                credential={{ section: 'webSearch', providerId: selectedProviderId }}
                 name={`web-search-api-key-${selectedProviderId}`}
                 placeholder={
                   !provider.requiresApiKey

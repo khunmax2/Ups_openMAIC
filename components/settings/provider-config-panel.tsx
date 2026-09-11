@@ -225,6 +225,7 @@ export function ProviderConfigPanel({
             <Label>{t('settings.apiSecret')}</Label>
             <div className="flex gap-2">
               <ApiKeyField
+                credential={{ section: 'providers', providerId: provider.id }}
                 name={`llm-api-key-${provider.id}`}
                 placeholder="sk-..."
                 value={apiKey}

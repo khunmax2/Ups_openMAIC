@@ -25,6 +25,7 @@ import {
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import { MAX_EXTRACT_DOCUMENT_FILE_SIZE_BYTES } from '@/lib/constants/generation';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 // The asset-id path resolves bytes from the server asset store, which lives in
 // the PostgreSQL persistence backend; it needs the Node runtime, not the edge.
@@ -437,7 +438,7 @@ async function runExtraction(
   return apiSuccess({ data: resultWithMetadata });
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const logState: ExtractLogState = {};
   // Whether this request took the asset-id (JSON) form. The multipart byte
   // form's observable behavior is frozen; a few JSON-path-only responses use
@@ -657,3 +658,7 @@ export async function POST(req: NextRequest) {
 function sanitizeLogValue(value: string): string {
   return value.replaceAll('\r', ' ').replaceAll('\n', ' ');
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

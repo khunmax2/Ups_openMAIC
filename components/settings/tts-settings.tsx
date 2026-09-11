@@ -426,6 +426,7 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
                   <Label className="text-sm">{t('settings.ttsApiKey')}</Label>
                   <ApiKeyField
                     name={`tts-api-key-${selectedProviderId}`}
+                    credential={{ section: 'tts', providerId: selectedProviderId }}
                     placeholder={t('settings.enterApiKey')}
                     value={ttsProvidersConfig[selectedProviderId]?.apiKey || ''}
                     onChange={(v) =>

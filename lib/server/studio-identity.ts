@@ -43,6 +43,26 @@ export function identityHeaderName(): string {
  */
 const IDENTITY_PREFIX = 'user:';
 
+const DEFAULT_ROLE_HEADER = 'x-deeptutor-role';
+
+export type StudioRole = 'admin' | 'user';
+
+/**
+ * The second header the gateway sets, beside the owner: the role it verified
+ * with DeepWitya. The studio has exactly one admin-only surface -- the shared
+ * default credentials every account falls back to -- and DeepWitya is the
+ * only thing that knows who is an admin. Anything but the literal `admin`,
+ * including a missing header, is `user`; no value a client could send
+ * survives the gateway, and with no gateway there is no admin.
+ */
+export function roleHeaderName(): string {
+  return (process.env.STUDIO_ROLE_HEADER || DEFAULT_ROLE_HEADER).toLowerCase();
+}
+
+export function readStudioRole(headers: Headers): StudioRole {
+  return headers.get(roleHeaderName())?.trim() === 'admin' ? 'admin' : 'user';
+}
+
 /**
  * DeepWitya's own bound on the value it puts after the prefix
  * (`AuthStatusResponse.user_id`, `min_length=1, max_length=64`). Matching it

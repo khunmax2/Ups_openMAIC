@@ -95,6 +95,7 @@ import {
   createPersonalHistorySource,
   PERSONAL_HISTORY_TOOL_NAMES,
 } from './personal-history-tools';
+import { runWithCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('AgentRunner');
 const WORKER_ID = `${randomUUID().slice(0, 8)}:${process.pid}`;
@@ -1877,10 +1878,16 @@ export function startAgentRunner(): AgentRunnerHandle {
         // Process-local fence in addition to the store's lease exclusion.
         if (ctx.running.has(meta.id)) continue;
         log.info(`claiming ${meta.id} (attempt ${meta.attempt})`);
-        void runSession(ctx, meta).catch((error) => {
-          log.error(`runSession ${meta.id} crashed`, error);
-          ctx.running.delete(meta.id);
-        });
+        // Fork: the session's tools resolve provider keys through the same
+        // funnel the HTTP routes use, so the owner's stored keys have to be in
+        // scope here as well. A job has no headers to read a role from; the
+        // default rows are what `user` means and are loaded either way.
+        void runWithCredentials(meta.ownerId, 'user', () => runSession(ctx, meta)).catch(
+          (error) => {
+            log.error(`runSession ${meta.id} crashed`, error);
+            ctx.running.delete(meta.id);
+          },
+        );
       }
     } catch (error) {
       log.error('claim scan failed', error);

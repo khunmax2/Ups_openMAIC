@@ -229,6 +229,7 @@ export function ASRSettings({ selectedProviderId }: ASRSettingsProps) {
             <div className="space-y-2">
               <Label className="text-sm">{t('settings.asrApiKey')}</Label>
               <ApiKeyField
+                credential={{ section: 'asr', providerId: selectedProviderId }}
                 name={`asr-api-key-${selectedProviderId}`}
                 placeholder={t('settings.enterApiKey')}
                 value={asrProvidersConfig[selectedProviderId]?.apiKey || ''}

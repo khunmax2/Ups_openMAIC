@@ -95,4 +95,13 @@ if (isBrowserPersistenceEnabled()) {
       error,
     );
   }
+
+  // Fork. Server-side credentials ride on the same condition as server-side
+  // persistence: a database behind the studio. Loaded lazily so the settings
+  // store (which this pulls in) is not part of every page's first module
+  // graph; a failure here leaves the browser holding its keys, upstream's
+  // shape, rather than breaking persistence.
+  void import('@/lib/credentials/client')
+    .then((m) => m.startCredentialSync())
+    .catch((error) => console.error('credential sync failed; browser keeps its keys', error));
 }

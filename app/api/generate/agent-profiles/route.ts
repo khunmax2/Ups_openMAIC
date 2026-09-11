@@ -14,6 +14,7 @@ import { resolveModelFromRequest } from '@/lib/server/resolve-model';
 import { AGENT_COLOR_PALETTE } from '@/lib/constants/agent-defaults';
 import { normalizeVoiceDesign } from '@/lib/audio/voice-design';
 import { isQwenCloneVoice, resolveTTSModelForVoice } from '@/lib/audio/constants';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('Agent Profiles API');
 
@@ -127,7 +128,7 @@ function stripCodeFences(text: string): string {
   return cleaned.trim();
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let stageName: string | undefined;
   let modelString: string | undefined;
   try {
@@ -366,3 +367,7 @@ Return a JSON object with this exact structure:
     return apiError('INTERNAL_ERROR', 500, error instanceof Error ? error.message : String(error));
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);
