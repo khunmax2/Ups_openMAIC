@@ -68,6 +68,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { assetPath } from '@/lib/base-path';
 
 // ============================================================================
 // Provider Context & Types
@@ -299,7 +300,7 @@ export function PromptInputAttachment({ data, className, ...props }: PromptInput
                   alt={filename || 'attachment'}
                   className="size-5 object-cover"
                   height={20}
-                  src={data.url}
+                  src={assetPath(data.url)}
                   width={20}
                 />
               ) : (
@@ -334,7 +335,7 @@ export function PromptInputAttachment({ data, className, ...props }: PromptInput
                 alt={filename || 'attachment preview'}
                 className="max-h-full max-w-full object-contain"
                 height={384}
-                src={data.url}
+                src={assetPath(data.url)}
                 width={448}
               />
             </div>

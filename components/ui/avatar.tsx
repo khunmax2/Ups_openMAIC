@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Avatar as AvatarPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
+import { assetPath } from '@/lib/base-path';
 
 function Avatar({
   className,
@@ -25,11 +26,21 @@ function Avatar({
   );
 }
 
-function AvatarImage({ className, ...props }: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+function AvatarImage({
+  className,
+  src,
+  ...props
+}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+  // Fork: avatars are root-relative paths ("/avatars/teacher.png") chosen by
+  // the model from a list, and Next prefixes basePath on nothing it did not
+  // generate itself. Every caller of this component would otherwise have to
+  // remember; three did not. assetPath() is idempotent, so a caller that
+  // already prefixed is unaffected.
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
       className={cn('rounded-full aspect-square size-full object-cover', className)}
+      src={typeof src === 'string' ? assetPath(src) : src}
       {...props}
     />
   );

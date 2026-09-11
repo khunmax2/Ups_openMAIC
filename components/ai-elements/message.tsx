@@ -9,6 +9,7 @@ import { ChevronLeftIcon, ChevronRightIcon, PaperclipIcon, XIcon } from 'lucide-
 import type { ComponentProps, HTMLAttributes, ReactElement } from 'react';
 import { createContext, memo, useContext, useEffect, useMemo, useState } from 'react';
 import { Streamdown } from 'streamdown';
+import { assetPath } from '@/lib/base-path';
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
@@ -299,7 +300,7 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
             alt={filename || 'attachment'}
             className="size-full object-cover"
             height={100}
-            src={data.url}
+            src={assetPath(data.url)}
             width={100}
           />
           {onRemove && (

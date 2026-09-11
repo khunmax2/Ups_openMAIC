@@ -85,7 +85,7 @@ import {
   isToleratedReactionStreamError,
   type StreamStatus,
 } from './use-instructor-stream';
-import { apiPath } from '@/lib/base-path';
+import { apiPath, assetPath } from '@/lib/base-path';
 
 interface Props {
   readonly project: PBLProjectV2;
@@ -870,7 +870,7 @@ function SubmissionViewer({
           {submission.mimeType?.startsWith('image/') && submission.fileUrl ? (
             <div className="space-y-3">
               <img
-                src={submission.fileUrl}
+                src={assetPath(submission.fileUrl)}
                 alt={submission.filename || 'submission'}
                 className="mx-auto max-h-[60vh] rounded-lg border border-cyan-100/[0.14] object-contain"
               />
@@ -1263,7 +1263,7 @@ function SubmissionModal({
           {hasImage && (
             <div className="flex items-center gap-2.5 rounded-xl border border-cyan-100/[0.14] bg-slate-700/[0.24] p-2">
               <img
-                src={fileUrl}
+                src={assetPath(fileUrl)}
                 alt={filename}
                 className="h-14 w-14 shrink-0 rounded-md border border-cyan-100/[0.14] object-cover"
               />

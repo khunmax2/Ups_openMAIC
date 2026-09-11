@@ -34,6 +34,7 @@ import { DEFAULT_TEACHER_AVATAR, DEFAULT_USER_AVATAR } from '@/components/roundt
 import type { DiscussionAction } from '@/lib/types/action';
 import type { EngineMode, PlaybackView } from '@/lib/playback';
 import type { Participant } from '@/lib/types/roundtable';
+import { assetPath } from '@/lib/base-path';
 
 export interface DiscussionRequest {
   topic: string;
@@ -1196,7 +1197,7 @@ export function Roundtable({
 
                       <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 overflow-hidden relative z-10 shadow-sm border border-gray-50 dark:border-gray-700">
                         <img
-                          src={teacherAvatar}
+                          src={assetPath(teacherAvatar)}
                           alt={teacherName}
                           className="w-full h-full object-cover"
                         />
@@ -1233,7 +1234,7 @@ export function Roundtable({
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-gray-100 dark:bg-gray-800">
                             <img
-                              src={teacherAvatar}
+                              src={assetPath(teacherAvatar)}
                               alt={teacherName}
                               className="w-full h-full object-cover"
                             />
@@ -1960,7 +1961,7 @@ export function Roundtable({
                             />
                             <div className="absolute inset-0.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
                               <img
-                                src={student.avatar}
+                                src={assetPath(student.avatar)}
                                 alt={student.name}
                                 className="w-full h-full"
                               />
@@ -1985,7 +1986,7 @@ export function Roundtable({
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-gray-100 dark:bg-gray-800">
                               <img
-                                src={student.avatar}
+                                src={assetPath(student.avatar)}
                                 alt={student.name}
                                 className="w-full h-full"
                               />

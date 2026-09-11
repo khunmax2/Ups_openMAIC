@@ -166,6 +166,7 @@ import {
   workspaceFoldersAvailable,
   WorkspaceFolderNameError,
 } from './workspace-folder-seam';
+import { assetPath } from '@/lib/base-path';
 
 type Discovery = ReturnType<typeof useHomeDiscovery>;
 type StageListItem = Discovery['classrooms'][number];
@@ -846,7 +847,7 @@ export function WorkspaceRail({
             never one control wearing both meanings. */}
         <HomeLink testId="pro-nav-home" onGoHome={onGoHome} className="-ml-1.5 px-1.5 py-1">
           <img
-            src={brand.logoSrc}
+            src={assetPath(brand.logoSrc)}
             alt=""
             aria-hidden="true"
             className="h-[21px] w-auto max-w-[110px] shrink-0"
