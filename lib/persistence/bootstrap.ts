@@ -17,16 +17,38 @@ export function isBrowserPersistenceEnabled(): boolean {
   return typeof window !== 'undefined' && process.env.NEXT_PUBLIC_PERSISTENCE === '1';
 }
 
+/**
+ * Fork. The server decides the learner partition, not the device.
+ *
+ * Upstream mints a per-device `anon:<uuid>` and puts it in every learner-scoped
+ * runtime path. Behind the gateway the server derives the learner key from the
+ * verified identity instead (server-auth.ts) and forbids a path that names any
+ * other -- so a device key in the URL was a 403 on every quiz, whiteboard and
+ * chat-history request, forty of them in one classroom session. Ask `whoami`
+ * first; fall back to the device key only when the server has no identity to
+ * offer (no gateway, or persistence not configured), which is upstream's shape.
+ */
+async function resolveServerLearnerKey(): Promise<string | undefined> {
+  try {
+    const response = await fetch(apiPath('/api/persistence/whoami'), { credentials: 'include' });
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { learnerKey?: unknown };
+    return typeof body.learnerKey === 'string' && body.learnerKey ? body.learnerKey : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getPersistenceLearnerKey(): Promise<string> {
   if (!isBrowserPersistenceEnabled()) {
     return Promise.reject(new Error('Browser persistence is not enabled'));
   }
-  return (learnerKeyPromise ??= getLearnerKey((deviceKv ??= new BrowserKVStore())).catch(
-    (error) => {
+  return (learnerKeyPromise ??= resolveServerLearnerKey()
+    .then((serverKey) => serverKey ?? getLearnerKey((deviceKv ??= new BrowserKVStore())))
+    .catch((error) => {
       learnerKeyPromise = undefined;
       throw error;
-    },
-  ));
+    }));
 }
 
 export async function getPersistenceRequestHeaders(): Promise<Record<string, string>> {

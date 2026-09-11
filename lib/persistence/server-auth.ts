@@ -48,6 +48,17 @@ function principalFor(ownerId: string): PersistencePrincipal {
 }
 
 /**
+ * The learner key the browser must use for this owner -- the same value the
+ * principal above carries, exported so the `whoami` answer and the policy
+ * check can never disagree. The browser cannot derive it: it does not see the
+ * gateway header, and its own device key (`anon:<uuid>`) is what every
+ * learner-scoped path carried before this existed -- every one of them 403.
+ */
+export function learnerKeyForOwner(ownerId: string): string {
+  return principalFor(ownerId).learnerKey ?? ownerId;
+}
+
+/**
  * The anonymous fallback exists so this fork stays runnable the way upstream
  * runs: with no gateway in front, identity is the anonymous cookie upstream
  * already mints, and assets partition by it exactly as documents do. It is
