@@ -302,11 +302,7 @@ async function generateOpenAITTS(
 
   const arrayBuffer = await response.arrayBuffer();
   const contentType = response.headers.get('content-type') || '';
-  const format = getAudioResponseFormat(contentType);
-  return {
-    audio: new Uint8Array(arrayBuffer),
-    format,
-  };
+  return decodeAudioResponse(arrayBuffer, contentType);
 }
 
 /**
@@ -347,10 +343,7 @@ async function generateLemonadeTTS(
 
   const arrayBuffer = await response.arrayBuffer();
   const contentType = response.headers.get('content-type') || '';
-  return {
-    audio: new Uint8Array(arrayBuffer),
-    format: getAudioResponseFormat(contentType),
-  };
+  return decodeAudioResponse(arrayBuffer, contentType);
 }
 
 /**
@@ -419,11 +412,7 @@ async function generateVoxCPMTTS(
 
   const arrayBuffer = await response.arrayBuffer();
   const contentType = response.headers.get('content-type') || '';
-  const format = getAudioResponseFormat(contentType);
-  return {
-    audio: new Uint8Array(arrayBuffer),
-    format,
-  };
+  return decodeAudioResponse(arrayBuffer, contentType);
 }
 
 function buildVoxCPMTargetText(text: string, voicePrompt?: string): string {
@@ -433,6 +422,159 @@ function buildVoxCPMTargetText(text: string, voicePrompt?: string): string {
     .replace(/\s+/gu, ' ')
     .trim();
   return prompt ? `(${prompt})${text}` : text;
+}
+
+/** Content types that carry PCM samples with no container around them. */
+const RAW_PCM_MEDIA_TYPES = new Set(['audio/l16', 'audio/pcm', 'audio/x-pcm']);
+
+/**
+ * RFC 2586 leaves the rate out of the media type when it is the default, but
+ * every OpenAI-compatible server met so far states it. 24 kHz mono is what they
+ * emit when they do not, and matches the rate `audio/L16` is used at in practice.
+ */
+const DEFAULT_PCM_SAMPLE_RATE = 24_000;
+const DEFAULT_PCM_CHANNELS = 1;
+
+/** `(sampleRate, channels)` when the response is headerless PCM, else null. */
+function parsePcmContentType(contentType: string): { sampleRate: number; channels: number } | null {
+  const [mediaType, ...params] = (contentType || '').split(';');
+  if (!RAW_PCM_MEDIA_TYPES.has(mediaType.trim().toLowerCase())) return null;
+
+  let sampleRate = DEFAULT_PCM_SAMPLE_RATE;
+  let channels = DEFAULT_PCM_CHANNELS;
+  for (const param of params) {
+    const eq = param.indexOf('=');
+    if (eq === -1) continue;
+    const key = param.slice(0, eq).trim().toLowerCase();
+    const parsed = Number.parseInt(
+      param
+        .slice(eq + 1)
+        .trim()
+        .replace(/^"|"$/g, ''),
+      10,
+    );
+    if (!Number.isFinite(parsed) || parsed <= 0) continue;
+    if (key === 'rate' || key === 'sample-rate' || key === 'samplerate') sampleRate = parsed;
+    else if (key === 'channels' || key === 'channel') channels = parsed;
+  }
+  return { sampleRate, channels };
+}
+
+/**
+ * Which byte order the samples are in.
+ *
+ * RFC 2586 defines `audio/L16` as **big**-endian, and `audio/pcm` as little.
+ * Real gateways disagree with the spec often enough that trusting either default
+ * produces noise on the other half of them — the server this was first tested
+ * against labels its output `audio/L16;rate=24000;channels=1` and sends
+ * little-endian.
+ *
+ * So measure instead of assuming. Speech is a continuous waveform: read with the
+ * right byte order consecutive samples move smoothly, and with the wrong one the
+ * high and low bytes swap and every step becomes a jump. On that first server the
+ * two readings differed by a factor of thirteen, which is not a close call.
+ *
+ * `TTS_L16_BYTE_ORDER` forces the choice when a gateway is known and the audio is
+ * too short or too quiet to measure.
+ */
+function detectByteOrder(pcm: Uint8Array, mediaType: string): 'little' | 'big' {
+  const forced = process.env.TTS_L16_BYTE_ORDER;
+  if (forced === 'little' || forced === 'big') return forced;
+
+  // audio/pcm and audio/x-pcm are little-endian by definition; only L16 is in
+  // doubt, so only L16 pays for the measurement.
+  if (mediaType !== 'audio/l16') return 'little';
+
+  const frames = Math.floor(pcm.length / 2);
+  // Too little to judge: fall back to what the specification says.
+  if (frames < 64) return 'big';
+
+  const view = new DataView(pcm.buffer, pcm.byteOffset, frames * 2);
+  let littleSteps = 0;
+  let bigSteps = 0;
+  let previousLittle = view.getInt16(0, true);
+  let previousBig = view.getInt16(0, false);
+  // Every eighth frame is plenty and keeps this off the critical path.
+  for (let i = 8; i < frames; i += 8) {
+    const little = view.getInt16(i * 2, true);
+    const big = view.getInt16(i * 2, false);
+    littleSteps += Math.abs(little - previousLittle);
+    bigSteps += Math.abs(big - previousBig);
+    previousLittle = little;
+    previousBig = big;
+  }
+  if (littleSteps === 0 && bigSteps === 0) return 'big'; // silence — nothing to measure
+  return littleSteps <= bigSteps ? 'little' : 'big';
+}
+
+/** Swap every 16-bit pair, in place. WAV is little-endian; big-endian PCM is not. */
+function swapBytes(pcm: Uint8Array): Uint8Array {
+  const out = new Uint8Array(pcm.length - (pcm.length % 2));
+  for (let i = 0; i + 1 < pcm.length; i += 2) {
+    out[i] = pcm[i + 1];
+    out[i + 1] = pcm[i];
+  }
+  return out;
+}
+
+/** Prepend the 44-byte RIFF/WAVE header that turns PCM16 into a playable file. */
+function pcm16ToWav(pcm: Uint8Array, sampleRate: number, channels: number): Uint8Array {
+  const bytesPerSample = 2;
+  const blockAlign = channels * bytesPerSample;
+  const out = new Uint8Array(44 + pcm.length);
+  const view = new DataView(out.buffer);
+  const ascii = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i++) out[offset + i] = text.charCodeAt(i);
+  };
+
+  ascii(0, 'RIFF');
+  view.setUint32(4, 36 + pcm.length, true);
+  ascii(8, 'WAVE');
+  ascii(12, 'fmt ');
+  view.setUint32(16, 16, true); // PCM header length
+  view.setUint16(20, 1, true); // format 1 = uncompressed PCM
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true); // byte rate
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 8 * bytesPerSample, true);
+  ascii(36, 'data');
+  view.setUint32(40, pcm.length, true);
+  out.set(pcm, 44);
+  return out;
+}
+
+/**
+ * Turn a speech response into something an `<audio>` element can actually play.
+ *
+ * Providers that answer `/v1/audio/speech` are not obliged to return a container,
+ * and several return `audio/L16` — bare PCM samples. `getAudioResponseFormat`
+ * did not recognise those and fell through to its `mp3` default, so the bytes
+ * reached the browser labelled as MP3 and every consumer failed the same way:
+ * `new Audio(URL.createObjectURL(blob))` cannot decode them, and the only
+ * symptom is the browser's own "no supported source was found".
+ *
+ * Wrapping here rather than at each player fixes preview, regeneration and
+ * classroom playback at once, and keeps the rule in one place: everything past
+ * this function is in a container.
+ */
+export function decodeAudioResponse(
+  arrayBuffer: ArrayBuffer,
+  contentType: string,
+): TTSGenerationResult {
+  const bytes = new Uint8Array(arrayBuffer);
+  const pcm = parsePcmContentType(contentType);
+  if (pcm) {
+    const mediaType = (contentType || '').split(';')[0].trim().toLowerCase();
+    // WAV stores samples little-endian, so big-endian PCM has to be swapped
+    // rather than merely wrapped — a header alone would describe it wrongly.
+    const samples = detectByteOrder(bytes, mediaType) === 'big' ? swapBytes(bytes) : bytes;
+    return {
+      audio: pcm16ToWav(samples, pcm.sampleRate, pcm.channels),
+      format: 'wav',
+    };
+  }
+  return { audio: bytes, format: getAudioResponseFormat(contentType) };
 }
 
 function getAudioResponseFormat(contentType: string): string {
