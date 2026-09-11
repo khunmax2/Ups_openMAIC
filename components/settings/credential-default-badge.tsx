@@ -23,7 +23,7 @@ export function CredentialDefaultBadge({
   return (
     <span
       className="text-[10px] px-1 py-0 h-4 leading-4 rounded shrink-0 bg-primary/10 text-primary"
-      title={t('settings.apiKeyFromDefault')}
+      title={t('settings.apiKeyFromShared')}
     >
       {t('settings.credentialDefaultBadge')}
     </span>

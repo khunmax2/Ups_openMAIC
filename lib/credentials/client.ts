@@ -185,12 +185,27 @@ function reconcileSection(
   return next;
 }
 
-function applyMeta(meta: CredentialMeta, role: 'admin' | 'user') {
+function defaultsFrom(list: ListResponse): SettingsState['credentialDefaults'] {
+  const out: SettingsState['credentialDefaults'] = {};
+  for (const section of CREDENTIAL_SECTIONS) {
+    for (const [id, row] of Object.entries(list.defaults[section] ?? {})) {
+      out[metaKey(section, id)] = row;
+    }
+  }
+  return out;
+}
+
+function applyMeta(
+  meta: CredentialMeta,
+  role: 'admin' | 'user',
+  defaults: SettingsState['credentialDefaults'],
+) {
   useSettingsStore.setState((state) => {
     const patch: Partial<SettingsState> = {
       credentialStorage: 'server',
       credentialRole: role,
       credentialMeta: meta,
+      credentialDefaults: defaults,
     };
     for (const section of CREDENTIAL_SECTIONS) {
       (patch as Record<string, unknown>)[STORE_KEY[section]] = reconcileSection(
@@ -304,7 +319,7 @@ export async function startCredentialSync(): Promise<void> {
     return;
   }
   const meta = await migrateStoredKeys(metaFrom(list));
-  applyMeta(meta, list.role);
+  applyMeta(meta, list.role, defaultsFrom(list));
   watchStore();
 }
 
@@ -312,7 +327,7 @@ export async function startCredentialSync(): Promise<void> {
 export async function refreshCredentials(): Promise<void> {
   const list = await listFromServer();
   if (!list || list.storage !== 'server') return;
-  applyMeta(metaFrom(list), list.role);
+  applyMeta(metaFrom(list), list.role, defaultsFrom(list));
 }
 
 /** Test seam. */

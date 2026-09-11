@@ -220,6 +220,8 @@ export interface SettingsState {
   credentialStorage: 'unknown' | 'server' | 'none';
   credentialRole: 'admin' | 'user';
   credentialMeta: Record<string, { masked: string; baseUrl: string; source: 'own' | 'default' }>;
+  /** The default rows alone, so an admin can see whether their own key already is one. */
+  credentialDefaults: Record<string, { masked: string; baseUrl: string }>;
 
   // Global TTS/ASR toggles
   ttsEnabled: boolean;
@@ -926,6 +928,7 @@ export const useSettingsStore = create<SettingsState>()(
         credentialStorage: 'unknown' as const,
         credentialRole: 'user' as const,
         credentialMeta: {},
+        credentialDefaults: {},
         ttsModel: 'openai-tts',
         selectedAgentIds: ['default-1', 'default-2', 'default-3'],
         agentMode: 'auto' as const,

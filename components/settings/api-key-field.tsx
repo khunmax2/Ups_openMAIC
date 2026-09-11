@@ -13,9 +13,17 @@
  */
 
 import { useState } from 'react';
-import { Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Eye, EyeOff, Trash2, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   CREDENTIAL_SENTINEL,
@@ -83,8 +91,39 @@ export function ApiKeyField({
   const meta = useSettingsStore((s) => (key ? s.credentialMeta[key] : undefined));
   const role = useSettingsStore((s) => s.credentialRole);
   const serverBacked = useSettingsStore((s) => s.credentialStorage === 'server');
+  const defaultRow = useSettingsStore((s) => (key ? s.credentialDefaults[key] : undefined));
+  // The admin's own key that is also the shared one: same mask, same base URL.
+  const isShared =
+    !!meta &&
+    !!defaultRow &&
+    meta.masked === defaultRow.masked &&
+    meta.baseUrl === defaultRow.baseUrl;
 
   const stored = Boolean(value) && !typed && !editing;
+
+  const withBusy = async (work: () => Promise<boolean | undefined>) => {
+    if (!credential) return;
+    setBusy(true);
+    try {
+      if (await work()) await refreshCredentials();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const removeOwn = () =>
+    withBusy(() => removeCredential(credential!.section, credential!.providerId));
+  const stopSharing = () =>
+    withBusy(() => removeCredential(credential!.section, credential!.providerId, 'default'));
+  const share = () =>
+    withBusy(async () => {
+      const stored = await putCredential(
+        credential!.section,
+        credential!.providerId,
+        { copyFromOwner: true },
+        'default',
+      );
+      return stored !== undefined;
+    });
 
   if (stored) {
     const masked = value === CREDENTIAL_SENTINEL && meta ? meta.masked : maskApiKey(value);
@@ -115,7 +154,7 @@ export function ApiKeyField({
           >
             {t('settings.apiKeyChange')}
           </Button>
-          {own && credential && (
+          {own && credential && role !== 'admin' && (
             <Button
               type="button"
               variant="ghost"
@@ -123,47 +162,70 @@ export function ApiKeyField({
               disabled={disabled || busy}
               aria-label={t('settings.apiKeyRemove')}
               title={t('settings.apiKeyRemove')}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  if (await removeCredential(credential.section, credential.providerId)) {
-                    await refreshCredentials();
-                  }
-                } finally {
-                  setBusy(false);
-                }
-              }}
+              onClick={() => void removeOwn()}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
+          {own && credential && role === 'admin' && serverBacked && (
+            // The admin's actions on their own key -- share it with every
+            // account, stop sharing, remove it -- in one menu on the key's
+            // row. Sharing is the one admin-only action in the studio, so
+            // its state is also shown without opening the menu.
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant={isShared ? 'secondary' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={disabled || busy}
+                  aria-label={t('settings.apiKeyActions')}
+                >
+                  <Users className={cn('h-3.5 w-3.5', isShared && 'text-primary')} />
+                  {isShared ? t('settings.apiKeySharedShort') : null}
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[260px]">
+                {isShared ? (
+                  <>
+                    <DropdownMenuLabel className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                      {t('settings.apiKeyIsShared')}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem className="gap-2" onClick={() => void stopSharing()}>
+                      <Users className="h-3.5 w-3.5" />
+                      {t('settings.apiKeyStopSharing')}
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem className="gap-2" onClick={() => void share()}>
+                    <Users className="h-3.5 w-3.5" />
+                    <span className="flex flex-col">
+                      <span>{t('settings.apiKeyShare')}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {t('settings.apiKeyShareHint')}
+                      </span>
+                    </span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2 text-destructive focus:text-destructive"
+                  onClick={() => void removeOwn()}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {t('settings.apiKeyRemove')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
-        {serverBacked && (fromDefault || (own && role === 'admin')) && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {fromDefault && <span>{t('settings.apiKeyFromDefault')}</span>}
-            {own && role === 'admin' && credential && (
-              <button
-                type="button"
-                className="underline-offset-2 hover:underline disabled:opacity-50"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    const stored = await putCredential(
-                      credential.section,
-                      credential.providerId,
-                      { copyFromOwner: true },
-                      'default',
-                    );
-                    if (stored !== undefined) await refreshCredentials();
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                {t('settings.apiKeySetDefault')}
-              </button>
-            )}
+        {serverBacked && fromDefault && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span>{t('settings.apiKeyFromShared')}</span>
           </div>
         )}
       </div>
