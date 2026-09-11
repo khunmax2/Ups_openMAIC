@@ -32,6 +32,8 @@ export interface FakeDocumentStore {
   saveCalls: MaicDocument<AppScene, AppStage>[];
   /** Make the next saveDocument call throw (e.g. a validation failure). */
   failNextSaveWith(error: unknown): void;
+  /** Make the next deleteDocument call throw (e.g. the owner scope refusing a foreign id). */
+  failNextDeleteWith(error: unknown): void;
 }
 
 /** The fake store is already one owner's partition, so scoping is identity. */
@@ -45,6 +47,7 @@ export function createFakeDocumentStore(): FakeDocumentStore {
   const sceneRevs = new Map<string, Map<string, number>>();
   const saveCalls: MaicDocument<AppScene, AppStage>[] = [];
   let saveError: unknown = null;
+  let deleteError: unknown;
 
   const bumpStage = (stageId: string) => {
     stageRevs.set(stageId, (stageRevs.get(stageId) ?? 0) + 1);
@@ -112,6 +115,11 @@ export function createFakeDocumentStore(): FakeDocumentStore {
         .sort((left, right) => left.id.localeCompare(right.id));
     },
     async deleteDocument(stageId: string) {
+      if (deleteError) {
+        const error = deleteError;
+        deleteError = undefined;
+        throw error;
+      }
       docs.delete(stageId);
       stageRevs.delete(stageId);
       sceneRevs.delete(stageId);
@@ -215,6 +223,9 @@ export function createFakeDocumentStore(): FakeDocumentStore {
     saveCalls,
     failNextSaveWith(error) {
       saveError = error;
+    },
+    failNextDeleteWith(error) {
+      deleteError = error;
     },
   };
 }

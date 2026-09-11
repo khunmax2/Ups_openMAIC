@@ -27,10 +27,13 @@ import type { IncomingMessage } from 'node:http';
 import type { AssetPrincipal } from '@openmaic/storage';
 import type { RuntimeHttpPrincipal } from '@openmaic/storage/server';
 
-import { readAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
+import {
+  readAnonymousOwnerId,
+  readVerifiedOrAnonymousOwnerId,
+} from '@/lib/server/agent-runtime/owner';
 import {
   identityHeaderName,
-  readStudioOwnerId,
+  studioGatewayRequired,
   studioOwnerIdFrom,
 } from '@/lib/server/studio-identity';
 
@@ -70,7 +73,7 @@ export function learnerKeyForOwner(ownerId: string): string {
  * It mints nothing: a request with neither header nor cookie is unauthenticated.
  */
 function ownerFor(headers: Headers): string | undefined {
-  return readStudioOwnerId(headers) ?? readAnonymousOwnerId(headers);
+  return readVerifiedOrAnonymousOwnerId(headers);
 }
 
 export function authenticatePersistenceHeaders(headers: Headers): PersistencePrincipal | undefined {
@@ -89,6 +92,10 @@ export async function authenticatePersistenceRequest(
   const ownerId = studioOwnerIdFrom(Array.isArray(raw) ? raw[0] : raw);
   if (ownerId) return principalFor(ownerId);
 
+  // Same rule as ownerFor: where the gateway is required, the cookie is not
+  // an identity. This is the WebSocket upgrade's path, which the Fetch-header
+  // variant above never sees.
+  if (studioGatewayRequired()) return undefined;
   const cookie = req.headers.cookie;
   if (!cookie) return undefined;
   const anonymous = readAnonymousOwnerId(new Headers({ cookie }));

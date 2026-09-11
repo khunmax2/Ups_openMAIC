@@ -183,7 +183,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   return withRequestOwnerId(req, async (ownerId, responseHeaders) => {
     const { id } = await params;
     const store = await getOwnerScopedDocumentStore(ownerId);
-    await store.deleteDocument(id);
+    try {
+      await store.deleteDocument(id);
+    } catch (error) {
+      // A foreign, missing or tombstoned id throws StageAccessError, a
+      // DocumentNotFoundError: the same 404 the read gives, not a 500.
+      return mapSaveError(error, responseHeaders);
+    }
     return ownerJson({ ok: true }, 200, responseHeaders);
   });
 }

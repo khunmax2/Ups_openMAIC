@@ -12,10 +12,9 @@
  * role comes from the gateway's header, never from the request body.
  */
 
-import { readAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
+import { readVerifiedOrAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import {
-  readStudioOwnerId,
   readStudioRole,
   refuseWithoutStudioIdentity,
   studioGatewayRequired,
@@ -46,9 +45,9 @@ function jsonError(status: number, code: string, message: string): Response {
   return json(status, { error: { code, message } });
 }
 
-/** The identity the gateway set, or the anonymous cookie without a gateway. */
+/** The identity the gateway set, or -- only without a gateway -- the anonymous cookie. */
 function ownerOf(request: Request): string | Response {
-  const owner = readStudioOwnerId(request.headers) ?? readAnonymousOwnerId(request.headers);
+  const owner = readVerifiedOrAnonymousOwnerId(request.headers);
   if (owner) return owner;
   if (studioGatewayRequired()) return refuseWithoutStudioIdentity();
   return jsonError(401, 'UNAUTHENTICATED', 'no identity on this request');

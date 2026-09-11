@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { readStudioOwnerId, studioGatewayRequired } from '@/lib/server/studio-identity';
+
 const ANONYMOUS_COOKIE = 'anonymous_id';
 const ANONYMOUS_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -58,6 +60,29 @@ function anonymousCookieHeader(id: string): string {
 export function readAnonymousOwnerId(headers: Headers): string | undefined {
   const existingId = readCookie(headers, ANONYMOUS_COOKIE);
   return existingId && UUID_V4.test(existingId) ? `anon:${existingId}` : undefined;
+}
+
+/**
+ * Fork. The owner this request may act as, without minting: the verified
+ * identity the gateway set, else -- only where this deployment does not
+ * require the gateway -- the anonymous cookie. Where the gateway is required
+ * an anonymous cookie is not an identity, and the answer is undefined so the
+ * caller refuses.
+ *
+ * `withRequestOwnerId` has always applied this order; four other readers
+ * (the credentials routes, the credential context wrapper, persistence auth
+ * and the classroom job) read `verified ?? anonymous` instead, so a request
+ * that reached the app without passing the gateway, carrying nothing but a
+ * well-formed anonymous cookie, was served under that cookie -- with the
+ * admin's shared credentials loaded for it. Found by the 2026-09-11 audit
+ * (F4). Not reachable through the deployment's front door, where the gateway
+ * is the only route in; a second layer that did not fail closed.
+ */
+export function readVerifiedOrAnonymousOwnerId(headers: Headers): string | undefined {
+  const verified = readStudioOwnerId(headers);
+  if (verified) return verified;
+  if (studioGatewayRequired()) return undefined;
+  return readAnonymousOwnerId(headers);
 }
 
 export function resolveRequestOwnerId(

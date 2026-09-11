@@ -16,9 +16,9 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { readAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
+import { readVerifiedOrAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
 import { getServerPersistenceProvider } from '@/lib/persistence/server-provider';
-import { readStudioOwnerId, readStudioRole, type StudioRole } from '@/lib/server/studio-identity';
+import { readStudioRole, type StudioRole } from '@/lib/server/studio-identity';
 
 import {
   ensureCredentialSchema,
@@ -161,7 +161,9 @@ export function withOwnerCredentials<
     // headers to read; run it as upstream would rather than throw.
     const headers = request?.headers;
     if (!headers || typeof headers.get !== 'function') return handler(request, ...rest);
-    const ownerId = readStudioOwnerId(headers) ?? readAnonymousOwnerId(headers);
+    // Where the gateway is required an anonymous cookie is not an owner, and
+    // nothing is loaded for it -- in particular not the admin's shared rows.
+    const ownerId = readVerifiedOrAnonymousOwnerId(headers);
     if (!ownerId) return handler(request, ...rest);
     return runWithCredentials(ownerId, readStudioRole(request.headers), () =>
       handler(request, ...rest),
