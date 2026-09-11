@@ -1394,6 +1394,8 @@
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
     "credentialDefaultBadge": "System default",
+    "apiKeyIsDefault": "Set as the system default",
+    "apiKeyUnsetDefault": "Unset default",
     "enterCustomBaseUrl": "أدخل عنوانًا أساسيًا مخصصًا",
     "browserNativeNote": "التعرف على الكلام المُدمج في المتصفح لا يحتاج تكوينًا وهو مجاني تمامًا",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

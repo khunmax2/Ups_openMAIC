@@ -1394,6 +1394,8 @@
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
     "credentialDefaultBadge": "System default",
+    "apiKeyIsDefault": "Set as the system default",
+    "apiKeyUnsetDefault": "Unset default",
     "enterCustomBaseUrl": "カスタムベースURLを入力",
     "browserNativeNote": "ブラウザネイティブASRは設定不要で完全無料です",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

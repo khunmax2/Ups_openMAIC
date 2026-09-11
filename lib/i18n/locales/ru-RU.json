@@ -1394,6 +1394,8 @@
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
     "credentialDefaultBadge": "System default",
+    "apiKeyIsDefault": "Set as the system default",
+    "apiKeyUnsetDefault": "Unset default",
     "enterCustomBaseUrl": "Введите пользовательский Base URL",
     "browserNativeNote": "Встроенный ASR браузера не требует настройки и полностью бесплатен",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

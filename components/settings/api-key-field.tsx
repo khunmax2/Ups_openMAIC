@@ -13,7 +13,7 @@
  */
 
 import { useState } from 'react';
-import { Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Check, Eye, EyeOff, Trash2, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +83,13 @@ export function ApiKeyField({
   const meta = useSettingsStore((s) => (key ? s.credentialMeta[key] : undefined));
   const role = useSettingsStore((s) => s.credentialRole);
   const serverBacked = useSettingsStore((s) => s.credentialStorage === 'server');
+  const defaultRow = useSettingsStore((s) => (key ? s.credentialDefaults[key] : undefined));
+  // The admin's own key that is also the default: same mask, same base URL.
+  const isTheDefault =
+    !!meta &&
+    !!defaultRow &&
+    meta.masked === defaultRow.masked &&
+    meta.baseUrl === defaultRow.baseUrl;
 
   const stored = Boolean(value) && !typed && !editing;
 
@@ -138,13 +145,50 @@ export function ApiKeyField({
             </Button>
           )}
         </div>
-        {serverBacked && (fromDefault || (own && role === 'admin')) && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {fromDefault && <span>{t('settings.apiKeyFromDefault')}</span>}
-            {own && role === 'admin' && credential && (
-              <button
+        {serverBacked && fromDefault && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span>{t('settings.apiKeyFromDefault')}</span>
+          </div>
+        )}
+        {serverBacked && own && role === 'admin' && credential && (
+          // The one admin-only action in the studio, and it shares a key with
+          // every account -- a real button, not a line of grey text that was
+          // missed the first time anyone looked for it.
+          <div className="flex items-center gap-2">
+            {isTheDefault ? (
+              <>
+                <span className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary">
+                  <Check className="h-3.5 w-3.5" />
+                  {t('settings.apiKeyIsDefault')}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      if (
+                        await removeCredential(credential.section, credential.providerId, 'default')
+                      ) {
+                        await refreshCredentials();
+                      }
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  {t('settings.apiKeyUnsetDefault')}
+                </Button>
+              </>
+            ) : (
+              <Button
                 type="button"
-                className="underline-offset-2 hover:underline disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true);
@@ -161,8 +205,9 @@ export function ApiKeyField({
                   }
                 }}
               >
+                <Users className="h-3.5 w-3.5" />
                 {t('settings.apiKeySetDefault')}
-              </button>
+              </Button>
             )}
           </div>
         )}

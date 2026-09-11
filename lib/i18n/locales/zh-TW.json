@@ -1379,6 +1379,8 @@
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
     "credentialDefaultBadge": "System default",
+    "apiKeyIsDefault": "Set as the system default",
+    "apiKeyUnsetDefault": "Unset default",
     "enterCustomBaseUrl": "輸入自訂 Base URL",
     "browserNativeNote": "瀏覽器原生 ASR 無須設定，完全免費",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

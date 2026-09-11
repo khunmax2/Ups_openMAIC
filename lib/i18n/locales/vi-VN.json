@@ -1394,6 +1394,8 @@
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
     "credentialDefaultBadge": "System default",
+    "apiKeyIsDefault": "Set as the system default",
+    "apiKeyUnsetDefault": "Unset default",
     "enterCustomBaseUrl": "Nhập địa chỉ gốc tùy chỉnh",
     "browserNativeNote": "Nhận dạng giọng nói của trình duyệt không cần cấu hình gì và hoàn toàn miễn phí",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

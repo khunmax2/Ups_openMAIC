@@ -1394,6 +1394,8 @@
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
     "credentialDefaultBadge": "System default",
+    "apiKeyIsDefault": "Set as the system default",
+    "apiKeyUnsetDefault": "Unset default",
     "enterCustomBaseUrl": "사용자 지정 Base URL 입력",
     "browserNativeNote": "브라우저 기본 ASR은 별도 설정이 필요 없으며 완전히 무료입니다",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

@@ -1394,6 +1394,8 @@
     "apiKeyFromDefault": "ใช้ค่าเริ่มต้นที่ผู้ดูแลระบบตั้งไว้",
     "apiKeySetDefault": "ตั้งเป็นค่าเริ่มต้นของระบบ",
     "credentialDefaultBadge": "ค่าเริ่มต้นระบบ",
+    "apiKeyIsDefault": "เป็นค่าเริ่มต้นของระบบแล้ว",
+    "apiKeyUnsetDefault": "ยกเลิกค่าเริ่มต้น",
     "enterCustomBaseUrl": "ใส่ Base URL ของคุณเอง",
     "browserNativeNote": "ASR ในเบราว์เซอร์ไม่ต้องตั้งค่าอะไร และใช้ฟรีทั้งหมด",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",
