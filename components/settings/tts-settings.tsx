@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -40,8 +41,6 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Eye,
-  EyeOff,
   Plus,
   Route,
   Server,
@@ -131,8 +130,6 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
           'default'
         : DEFAULT_TTS_VOICES[selectedProviderId as keyof typeof DEFAULT_TTS_VOICES] || 'default';
   const cloneSpeedDisabled = selectedProviderId === 'qwen-tts' && isQwenCloneVoice(effectiveVoice);
-
-  const [showApiKey, setShowApiKey] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [testText, setTestText] = useState(t('settings.ttsTestTextDefault'));
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -164,7 +161,6 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
   // Reset transient UI state when switching providers.
   useEffect(() => {
     stopPreview();
-    setShowApiKey(false);
     setTestStatus('idle');
     setTestMessage('');
   }, [selectedProviderId, stopPreview]);
@@ -406,81 +402,39 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
                 <>
                   <div className="space-y-2">
                     <Label className="text-sm">{t('settings.doubaoAppId')}</Label>
-                    <div className="relative">
-                      <Input
-                        name={`tts-app-id-${selectedProviderId}`}
-                        type={showApiKey ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        placeholder={t('settings.enterApiKey')}
-                        value={doubaoAppId}
-                        onChange={(e) => setDoubaoCompoundKey(e.target.value, doubaoAccessKey)}
-                        className="font-mono text-sm pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
+                    <ApiKeyField
+                      name={`tts-app-id-${selectedProviderId}`}
+                      placeholder={t('settings.enterApiKey')}
+                      value={doubaoAppId}
+                      onChange={(v) => setDoubaoCompoundKey(v, doubaoAccessKey)}
+                      className="flex-1"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm">{t('settings.doubaoAccessKey')}</Label>
-                    <div className="relative">
-                      <Input
-                        name={`tts-access-key-${selectedProviderId}`}
-                        type={showApiKey ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        placeholder={t('settings.enterApiKey')}
-                        value={doubaoAccessKey}
-                        onChange={(e) => setDoubaoCompoundKey(doubaoAppId, e.target.value)}
-                        className="font-mono text-sm pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
+                    <ApiKeyField
+                      name={`tts-access-key-${selectedProviderId}`}
+                      placeholder={t('settings.enterApiKey')}
+                      value={doubaoAccessKey}
+                      onChange={(v) => setDoubaoCompoundKey(doubaoAppId, v)}
+                      className="flex-1"
+                    />
                   </div>
                 </>
               ) : (
                 <div className="space-y-2">
                   <Label className="text-sm">{t('settings.ttsApiKey')}</Label>
-                  <div className="relative">
-                    <Input
-                      name={`tts-api-key-${selectedProviderId}`}
-                      type={showApiKey ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      placeholder={t('settings.enterApiKey')}
-                      value={ttsProvidersConfig[selectedProviderId]?.apiKey || ''}
-                      onChange={(e) =>
-                        setTTSProviderConfig(selectedProviderId, {
-                          apiKey: e.target.value,
-                        })
-                      }
-                      className="font-mono text-sm pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+                  <ApiKeyField
+                    name={`tts-api-key-${selectedProviderId}`}
+                    placeholder={t('settings.enterApiKey')}
+                    value={ttsProvidersConfig[selectedProviderId]?.apiKey || ''}
+                    onChange={(v) =>
+                      setTTSProviderConfig(selectedProviderId, {
+                        apiKey: v,
+                      })
+                    }
+                    className="flex-1"
+                  />
                 </div>
               )}
               <div className="space-y-2">

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -19,8 +20,6 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Eye,
-  EyeOff,
   RotateCcw,
   Plus,
   Zap,
@@ -80,7 +79,6 @@ export function ProviderConfigPanel({
   const [apiKey, setApiKey] = useState(initialApiKey);
   const [baseUrl, setBaseUrl] = useState(initialBaseUrl);
   const [requiresApiKey, setRequiresApiKey] = useState(initialRequiresApiKey);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -226,30 +224,15 @@ export function ProviderConfigPanel({
           <div className="space-y-2">
             <Label>{t('settings.apiSecret')}</Label>
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  name={`llm-api-key-${provider.id}`}
-                  type={showApiKey ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="sk-..."
-                  value={apiKey}
-                  onChange={(e) => handleApiKeyChange(e.target.value)}
-                  onBlur={onSave}
-                  disabled={!requiresApiKey}
-                  className="h-8 pr-8"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  disabled={!requiresApiKey}
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <ApiKeyField
+                name={`llm-api-key-${provider.id}`}
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={handleApiKeyChange}
+                onBlur={onSave}
+                disabled={!requiresApiKey}
+                className="flex-1"
+              />
               <Button
                 variant="outline"
                 size="sm"

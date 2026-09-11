@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -26,7 +27,7 @@ import { useSettingsStore } from '@/lib/store/settings';
 import { ASR_PROVIDERS } from '@/lib/audio/constants';
 import type { ASRProviderId } from '@/lib/audio/types';
 import { isCustomASRProvider } from '@/lib/audio/types';
-import { Mic, MicOff, CheckCircle2, XCircle, Eye, EyeOff, Plus, Loader2 } from 'lucide-react';
+import { Mic, MicOff, CheckCircle2, XCircle, Plus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
@@ -56,8 +57,6 @@ export function ASRSettings({ selectedProviderId }: ASRSettingsProps) {
     ? !!providerConfig?.requiresApiKey
     : !!asrProvider?.requiresApiKey;
   const isKeylessLocalProvider = !isCustom && !requiresApiKey && !!asrProvider?.defaultBaseUrl;
-
-  const [showApiKey, setShowApiKey] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -70,7 +69,6 @@ export function ASRSettings({ selectedProviderId }: ASRSettingsProps) {
   const [prevProviderId, setPrevProviderId] = useState(selectedProviderId);
   if (selectedProviderId !== prevProviderId) {
     setPrevProviderId(selectedProviderId);
-    setShowApiKey(false);
     setTestStatus('idle');
     setTestMessage('');
     setASRResult('');
@@ -230,31 +228,17 @@ export function ASRSettings({ selectedProviderId }: ASRSettingsProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm">{t('settings.asrApiKey')}</Label>
-              <div className="relative">
-                <Input
-                  name={`asr-api-key-${selectedProviderId}`}
-                  type={showApiKey ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={t('settings.enterApiKey')}
-                  value={asrProvidersConfig[selectedProviderId]?.apiKey || ''}
-                  onChange={(e) =>
-                    setASRProviderConfig(selectedProviderId, {
-                      apiKey: e.target.value,
-                    })
-                  }
-                  className="font-mono text-sm pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <ApiKeyField
+                name={`asr-api-key-${selectedProviderId}`}
+                placeholder={t('settings.enterApiKey')}
+                value={asrProvidersConfig[selectedProviderId]?.apiKey || ''}
+                onChange={(v) =>
+                  setASRProviderConfig(selectedProviderId, {
+                    apiKey: v,
+                  })
+                }
+                className="flex-1"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm">{t('settings.asrBaseUrl')}</Label>
