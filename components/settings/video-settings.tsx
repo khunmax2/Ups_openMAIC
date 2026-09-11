@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { VideoProviderId } from '@/lib/media/types';
 import { apiPath } from '@/lib/base-path';
+import { resolveProbeModel } from '@/lib/store/settings-validation';
 
 interface VideoSettingsProps {
   selectedProviderId: VideoProviderId;
@@ -87,7 +88,13 @@ export function VideoSettings({ selectedProviderId }: VideoSettingsProps) {
         method: 'POST',
         headers: {
           'x-video-provider': selectedProviderId,
-          'x-video-model': videoModelId || '',
+          // The viewed provider's model, not the globally active one (same
+          // mismatch as image-settings.tsx).
+          'x-video-model': resolveProbeModel(
+            videoModelId,
+            currentProvider?.models ?? [],
+            currentConfig,
+          ),
           'x-api-key': currentConfig?.apiKey || '',
           'x-base-url': currentConfig?.baseUrl || '',
         },

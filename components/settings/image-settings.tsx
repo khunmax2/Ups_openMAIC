@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { ImageProviderId } from '@/lib/media/types';
 import { apiPath } from '@/lib/base-path';
+import { resolveProbeModel } from '@/lib/store/settings-validation';
 
 interface ImageSettingsProps {
   selectedProviderId: ImageProviderId;
@@ -125,7 +126,14 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
         method: 'POST',
         headers: {
           'x-image-provider': selectedProviderId,
-          'x-image-model': imageModelId || '',
+          // The viewed provider's model, not the globally active one -- they
+          // differ whenever the list on the left is on a provider other than
+          // the one the media popover has selected.
+          'x-image-model': resolveProbeModel(
+            imageModelId,
+            currentProvider?.models ?? [],
+            currentConfig,
+          ),
           'x-api-key': currentConfig?.apiKey || '',
           'x-base-url': currentConfig?.baseUrl || '',
         },

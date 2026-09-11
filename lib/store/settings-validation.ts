@@ -84,6 +84,30 @@ export function resolveSelectedModel(
   return availableModels[0]?.id ?? '';
 }
 
+/**
+ * The model a settings-page probe should send for the provider being VIEWED.
+ *
+ * The page's left-hand list only changes which provider is displayed; the
+ * store's `imageModelId` is the globally ACTIVE model, chosen in the media
+ * popover, and may belong to a different provider entirely. Sending it
+ * verbatim asks provider B whether it serves provider A's model -- observed
+ * as "OpenAI Compatible model not found: gpt-image-2 (server lists:
+ * qwen-image-2512)" with the right key, the right URL and the right custom
+ * model one row below the message. Prefer the active model only when this
+ * provider has it; otherwise the first of this provider's own models
+ * (catalogue, then the operator's custom entries).
+ */
+export function resolveProbeModel(
+  activeModelId: string,
+  builtInModels: Array<{ id: string }>,
+  config?: { customModels?: Array<{ id: string }>; replaceBuiltInModels?: boolean },
+): string {
+  const custom = config?.customModels ?? [];
+  const models =
+    config?.replaceBuiltInModels && custom.length > 0 ? custom : [...builtInModels, ...custom];
+  return resolveSelectedModel(activeModelId, models);
+}
+
 export interface LLMProviderCfgLike {
   requiresApiKey?: boolean;
   apiKey?: string;
