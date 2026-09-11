@@ -184,6 +184,30 @@ describe('server-side credentials, browser half', () => {
     expect(useSettingsStore.getState().imageProvidersConfig['custom-image']?.enabled).toBe(false);
   });
 
+  it('clears the base URL with the key when the row behind the sentinel is gone', async () => {
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    // First boot: the server has the row, key and base URL together.
+    fakeServer({
+      own: { image: { 'openai-image': { masked: 'sk-qw••••1db0', baseUrl: 'https://gpu/v1' } } },
+    });
+    const mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+    expect(useSettingsStore.getState().imageProvidersConfig['openai-image']).toMatchObject({
+      apiKey: '***',
+      baseUrl: 'https://gpu/v1',
+    });
+    // The row is removed (here, elsewhere, by an admin). A refresh must not
+    // leave the base URL sitting in the field as though it were a setting of
+    // its own -- for a provider with a real default it hides the placeholder.
+    fakeServer({});
+    await mod.refreshCredentials();
+    expect(useSettingsStore.getState().imageProvidersConfig['openai-image']).toMatchObject({
+      apiKey: '',
+      baseUrl: '',
+    });
+  });
+
   it('never persists a real key once the server holds them', async () => {
     fakeServer({});
     const { useSettingsStore } = await import('@/lib/store/settings');

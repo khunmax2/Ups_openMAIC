@@ -175,9 +175,12 @@ function reconcileSection(
         ...(firstSeen && entry.enabled === false ? { enabled: true } : {}),
       };
     } else if (entry.apiKey === CREDENTIAL_SENTINEL) {
-      // Removed elsewhere (another browser, an admin): nothing stands behind
-      // the sentinel any more.
-      next[id] = { ...entry, apiKey: '' };
+      // The row behind the sentinel is gone -- removed here, in another
+      // browser, or by an admin. The key and the base URL lived on that row
+      // together, so both go: a base URL left behind would sit in the field
+      // as though it were the person's own setting, and for a provider with
+      // a real default (api.openai.com) hide that default's placeholder.
+      next[id] = { ...entry, apiKey: '', baseUrl: '' };
     } else {
       next[id] = entry;
     }
