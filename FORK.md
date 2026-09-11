@@ -247,6 +247,27 @@ requests — and those are inputs, paired with English; removing them would make
 the product worse for Chinese users. Fenced blocks are what the model reads as
 a template for its own answer. 271 CJK characters became 143, none fenced.
 
+That fixed the outlines and left the buttons. The next Thai course had Thai
+outlines and a simulation whose controls still read 暂停 and 继续, in the same
+place in two different courses, because there is a second template root.
+`lib/prompts` decides what a course *is*; `packages/@openmaic/generation/
+templates` decides what the learner *sees* — the HTML of a simulation, a game,
+a 3D view, a diagram. `simulation-content/system.md` told the model, in a
+bullet list rather than a fence, that the control button reads "启动" /
+"暂停" / "继续" / "重新开始", and the model did as it was told. A guard that
+only looked at fences and only at `lib/prompts` passed while that shipped.
+
+So the guard now scans both roots, and for the templates whose output is
+learner-facing markup (`simulation-`, `game-`, `visualization3d-`, `diagram-`,
+`code-`, `procedural-skill-content`) it bans CJK anywhere, prose included —
+nothing in those files is an example of what a learner might say, so a label
+named in a bullet is copied as faithfully as one named in a fence. The
+button names became "Start" / "Pause" / "Resume" / "Restart" with the note that
+they are written in the teaching language; the worked simulation's
+`updateButton('启动')` became `updateButton(START_LABEL)` with the constant
+declared beside the state, so the example no longer carries a literal in any
+language. 217 CJK characters in that root became 139, all of them inputs.
+
 Two things this deliberately does not do:
 
 - **It does not touch fonts.** The first attempt at this, before the fork
@@ -257,8 +278,9 @@ Two things this deliberately does not do:
   that stay where they were. That, not the prompt edit, was the breakage.
 - **It does not claim to finish the job.** Chinese remains in the TS-side
   prompts (`lib/chat/pi/prompts.ts` has one fenced example, the PBL instructor
-  and planner carry more) and in `agent-system` / `director` prose. Each is a
-  separate, measured change; the guard above covers only `lib/prompts/*.md`.
+  and planner carry more, and `packages/@openmaic/generation/prompts-pbl` is
+  a third root the guard does not scan) and in `agent-system` / `director`
+  prose. Each is a separate, measured change.
 
 Reverting needs no rebuild of anything else: the templates are read with
 `fs.readFileSync` per call and ship into the image as files.

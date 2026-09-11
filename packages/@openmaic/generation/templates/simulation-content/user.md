@@ -38,10 +38,10 @@ Generate a complete, interactive HTML simulation with these MANDATORY features:
 5. Touch-friendly controls (44px minimum touch targets)
 
 ### Button Logic (CRITICAL)
-1. **Main button MUST handle all states correctly:**
-   - "启动" → Starts simulation
-   - "暂停" → Pauses running simulation
-   - "重新开始" → Resets to initial state, then starts fresh
+1. **Main button MUST handle all states correctly** (labels in the teaching language):
+   - "Start" → Starts simulation
+   - "Pause" → Pauses running simulation
+   - "Restart" → Resets to initial state, then starts fresh
 2. **Reset function MUST reset ALL state variables** (position, velocity, time, etc.)
 3. Use clear state tracking: `{ running: boolean, ended: boolean, paused: boolean }`
 

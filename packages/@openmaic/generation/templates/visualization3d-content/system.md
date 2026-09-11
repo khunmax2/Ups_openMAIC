@@ -46,8 +46,8 @@ scene.add(directionalLight);
 ```html
 <!-- Add these buttons to your controls -->
 <div class="zoom-controls">
-  <button id="zoom-in-btn" title="放大">+</button>
-  <button id="zoom-out-btn" title="缩小">−</button>
+  <button id="zoom-in-btn" title="Zoom in">+</button>
+  <button id="zoom-out-btn" title="Zoom out">−</button>
 </div>
 ```
 
@@ -159,8 +159,8 @@ const earth = new THREE.Mesh(earthGeometry, earthMaterial);
   "interactions": [
     { "type": "orbit", "target": "camera" },
     { "type": "slider", "param": "speed", "min": 0, "max": 10, "default": 1 },
-    { "type": "button", "action": "zoomIn", "label": "放大" },
-    { "type": "button", "action": "zoomOut", "label": "缩小" }
+    { "type": "button", "action": "zoomIn", "label": "Zoom in" },
+    { "type": "button", "action": "zoomOut", "label": "Zoom out" }
   ],
   "presets": [
     { "name": "View Earth", "state": { "cameraTarget": "earth" } }
