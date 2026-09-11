@@ -15,6 +15,7 @@ import type {
 import {
   enabledProviderIds,
   getServerImageProviders,
+  getUsableImageProviders,
   isServerProviderDisabled,
   resolveImageApiKey,
   resolveImageBaseUrl,
@@ -209,7 +210,7 @@ function selectProvider(
 export function buildGenerateImageTool(
   deps: GenerateImageToolDeps,
 ): AgentTool<typeof GenerateImageParams, unknown> {
-  const configuredProviders = deps.getConfiguredProviders ?? getServerImageProviders;
+  const configuredProviders = deps.getConfiguredProviders ?? getUsableImageProviders;
   const resolveProviderConfig =
     deps.resolveProviderConfig ??
     ((providerId: ImageProviderId): ImageGenerationConfig => ({

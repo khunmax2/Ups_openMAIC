@@ -224,6 +224,7 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
             <Label>API Key</Label>
             <div className="flex gap-2">
               <ApiKeyField
+                credential={{ section: 'image', providerId: selectedProviderId }}
                 name={`image-api-key-${selectedProviderId}`}
                 placeholder={t('settings.enterApiKey')}
                 value={currentConfig?.apiKey || ''}

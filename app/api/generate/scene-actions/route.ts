@@ -29,12 +29,13 @@ import { normalizeLegacyPBLContent } from '@/lib/pbl/legacy/read';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { llmApiError } from '@/lib/server/llm-error-response';
 import { resolveModelFromRequest } from '@/lib/server/resolve-model';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('Scene Actions API');
 
 export const maxDuration = 60;
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let outlineTitle: string | undefined;
   let resolvedModelString: string | undefined;
   try {
@@ -193,3 +194,7 @@ export async function POST(req: NextRequest) {
     return llmApiError(error);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

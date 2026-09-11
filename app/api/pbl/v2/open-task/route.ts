@@ -23,6 +23,7 @@ import { applyRequestLocaleToProject } from '@/lib/pbl/v2/api/locale';
 import { runInstructorTurn } from '@/lib/pbl/v2/agents/instructor';
 import { applyQuizSignalsToProject } from '@/lib/pbl/v2/operations/runtime/quiz-snapshot';
 import type { PBLProjectV2, PriorQuizResult } from '@/lib/pbl/v2/types';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 export const maxDuration = 300;
 
@@ -37,7 +38,7 @@ interface OpenTaskRequest {
   priorQuizResults?: PriorQuizResult[];
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let body: OpenTaskRequest;
   try {
     body = (await req.json()) as OpenTaskRequest;
@@ -91,3 +92,7 @@ export async function POST(req: NextRequest) {
     { signal: req.signal },
   );
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

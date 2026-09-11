@@ -40,6 +40,7 @@ import { resolveModelFromRequest } from '@/lib/server/resolve-model';
 import { sortDocumentImagesForVision } from '@/lib/document/bundle';
 import { resolveVisionImagesForPrompt } from '@/lib/persistence/resolve-vision-images';
 import { resolveVocationalActive } from '@/lib/config/feature-flags';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 const log = createLogger('Outlines Stream');
 
 export const maxDuration = 300;
@@ -284,7 +285,7 @@ function ensureUniqueOutlineId(outline: SceneOutline, usedIds: Set<string>): Sce
   return { ...outline, id };
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let requirementSnippet: string | undefined;
   let resolvedModelString: string | undefined;
   try {
@@ -714,3 +715,7 @@ export async function POST(req: NextRequest) {
     return apiError('INTERNAL_ERROR', 500, error instanceof Error ? error.message : String(error));
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

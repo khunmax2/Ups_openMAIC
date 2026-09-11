@@ -16,9 +16,10 @@ DeepWitya and the studio are joined by exactly two things:
 
 1. **A URL.** The studio is opened in an iframe with `?lang`, `?theme` and
    `?embed=1`. Nothing is read back.
-2. **One request header.** A gatekeeper in front of this app verifies the
-   DeepWitya session and states the result as `x-deeptutor-owner: user:<uid>`,
-   stripping any copy the client sent.
+2. **Two request headers.** A gatekeeper in front of this app verifies the
+   DeepWitya session and states the result as `x-deeptutor-owner: user:<uid>`
+   and `x-deeptutor-role: admin|user`, stripping any copy the client sent. The
+   role exists for exactly one surface, described below.
 
 Providers, API keys, model configuration and storage stay independent on both
 sides. There is no shared database, no shared config file, and no callback.
@@ -181,6 +182,51 @@ list we do not own.
 `baseUrl` the settings screen edits and the route honours, so an
 OpenAI-compatible endpoint is a matter of configuration. Worth writing down
 because it looked like a feature request and was a setting.
+
+*Later:* it needed one after all. The preloaded `gpt-image-*` catalogue, an
+empty base URL meaning OpenAI, a required key sent as `Bearer undefined`, and
+a probe on `/models/{id}` that most self-hosted servers do not implement each
+broke a real configuration, so `custom-image` ("OpenAI Compatible") exists
+with none of those assumptions — `lib/media/adapters/openai-compatible-image-adapter.ts`.
+
+### API keys live on the server, per owner
+
+Upstream keeps every provider key in the browser's `localStorage`, because
+upstream has no accounts to keep them under. Behind the gateway this fork
+does, and a key in `localStorage` is readable by the next person at the same
+machine and by anything injected into the page. DeepWitya keeps keys on the
+server and hands the browser `***`; this is that shape.
+
+- `lib/server/credentials/store.ts` — one table, `studio_credential`: `owner`
+  rows and `default` rows, key and base URL together. Plaintext at rest, on
+  the internal network, as DeepWitya's own settings files are.
+- `lib/server/credentials/routes.ts` — `GET/PUT/DELETE
+  /api/studio/credentials[/default]/{section}/{providerId}`. Every read is a
+  mask. The default scope needs `x-deeptutor-role: admin`; an admin promotes
+  their own key with `{ copyFromOwner: true }`, since the browser never holds
+  it. A stored base URL passes the SSRF guard once, at write.
+- `lib/server/credentials/context.ts` — the key resolvers in
+  `provider-config.ts` are synchronous and have 23 callers. Rather than change
+  their signature, the owner's rows are loaded once at the edge
+  (`withOwnerCredentials()` on each route that resolves a key,
+  `runWithCredentials()` around agent-runtime sessions and the classroom job)
+  into `AsyncLocalStorage`, and the one funnel `resolveSectionApiKey` consults
+  it. Precedence: operator-managed entry, own row, default row, client key.
+  The sentinel `***` is never a key. Server-side jobs select from *usable*
+  providers, which include what the owner stored.
+- `lib/credentials/client.ts` — on boot the server's masked list replaces
+  every stored key with the sentinel; a real key still in storage is sent
+  once and replaced (the migration for existing users); afterwards a typed
+  key is sent debounced and swapped for the sentinel on confirmation; the
+  persist layer never writes a real key once the server holds them.
+- `components/settings/api-key-field.tsx` — shows the server's mask, offers
+  remove, and for an admin "set as the system default".
+
+With no database (`storage: 'none'`) none of this runs and the browser keeps
+its keys — upstream's shape, unchanged. The gatekeeper also refuses
+DeepWitya's `learner` preset outright; that is DeepWitya's decision and lives
+in its repository, but it is why an `anon:` owner never appears here in the
+deployment.
 
 ## Rebasing onto a new upstream
 

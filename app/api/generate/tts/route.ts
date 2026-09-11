@@ -27,12 +27,13 @@ import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import { VOXCPM_AUTO_VOICE_ID, VOXCPM_TTS_PROVIDER_ID } from '@/lib/audio/voxcpm';
 import { QwenVoiceCloneError, qwenVoiceCloneErrorMessage } from '@/lib/audio/qwen-voice-clone';
 import { isQwenCloneVoice } from '@/lib/audio/constants';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('TTS API');
 
 export const maxDuration = 30;
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let ttsProviderId: string | undefined;
   let ttsVoice: string | undefined;
   let audioId: string | undefined;
@@ -191,3 +192,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

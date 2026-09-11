@@ -176,6 +176,7 @@ export function VideoSettings({ selectedProviderId }: VideoSettingsProps) {
             <Label>API Key</Label>
             <div className="flex gap-2">
               <ApiKeyField
+                credential={{ section: 'video', providerId: selectedProviderId }}
                 name={`video-api-key-${selectedProviderId}`}
                 placeholder={
                   selectedProviderId === 'kling' ? 'accessKey:secretKey' : t('settings.enterApiKey')

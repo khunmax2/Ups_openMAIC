@@ -34,12 +34,13 @@ import {
   ElementReferenceValidationError,
   resolveSlideElementReference,
 } from '@/lib/chat/pi/element-reference';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('Pi Chat API');
 
 export const maxDuration = 300;
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   if (!isPiChatEnabled()) {
     return apiError('INVALID_REQUEST', 404, 'Pi chat runtime is disabled');
   }
@@ -302,3 +303,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

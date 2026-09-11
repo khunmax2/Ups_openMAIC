@@ -31,6 +31,7 @@ import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import { resolveImageSize } from '@/lib/server/image-sizing';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('ImageGeneration API');
 
@@ -41,7 +42,7 @@ const log = createLogger('ImageGeneration API');
 // (Self-hosted Node servers ignore this value entirely.)
 export const maxDuration = 300;
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const body = (await request.json()) as ImageGenerationOptions;
 
@@ -130,3 +131,7 @@ export async function POST(request: NextRequest) {
     return apiError('INTERNAL_ERROR', 500, message);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

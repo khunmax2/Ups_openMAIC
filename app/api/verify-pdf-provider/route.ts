@@ -9,10 +9,11 @@ import {
 } from '@/lib/server/provider-config';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import { MINERU_CLOUD_DEFAULT_BASE } from '@/lib/pdf/constants';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 
 const log = createLogger('Verify PDF Provider');
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let providerId: string | undefined;
   try {
     const body = await req.json();
@@ -183,3 +184,7 @@ export async function POST(req: NextRequest) {
     return apiError('INTERNAL_ERROR', 500, errorMessage);
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);

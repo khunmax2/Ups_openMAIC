@@ -11,6 +11,7 @@ import {
   resolveTTSModel,
 } from '@/lib/server/provider-config';
 import { persistClassroomMediaBytes } from '@/lib/server/classroom-media-bytes';
+import { currentCredentialProviderIds } from '@/lib/server/credentials/context';
 
 export interface SceneTtsSummary {
   available: boolean;
@@ -28,9 +29,20 @@ export interface SceneTtsInput {
 }
 
 function enabledProviderIds(): TTSProviderId[] {
-  return Object.entries(getServerTTSProviders())
+  const listed = getServerTTSProviders();
+  const fromListing = Object.entries(listed)
     .filter(([id, config]) => id !== BROWSER_NATIVE_TTS_PROVIDER_ID && !config.disabled)
     .map(([id]) => id as TTSProviderId);
+  // Fork: what the owner (or the admin default) stored counts as configured,
+  // own rows first. Merged here rather than through a new provider-config
+  // export so a test's partial mock of that module keeps working.
+  const fromContext = currentCredentialProviderIds('tts').filter(
+    (id) =>
+      id !== BROWSER_NATIVE_TTS_PROVIDER_ID &&
+      !listed[id]?.disabled &&
+      !fromListing.includes(id as TTSProviderId),
+  ) as TTSProviderId[];
+  return [...fromContext, ...fromListing];
 }
 
 function narratorVoice(roster: SceneTtsInput['roster']) {

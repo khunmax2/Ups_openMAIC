@@ -214,6 +214,13 @@ export interface SettingsState {
     }
   >;
 
+  // Fork: server-side credentials (lib/credentials/client.ts). `apiKey`
+  // fields above hold the sentinel `***` when the server holds the key; this
+  // is what the browser is told about those keys, and nothing more.
+  credentialStorage: 'unknown' | 'server' | 'none';
+  credentialRole: 'admin' | 'user';
+  credentialMeta: Record<string, { masked: string; baseUrl: string; source: 'own' | 'default' }>;
+
   // Global TTS/ASR toggles
   ttsEnabled: boolean;
   asrEnabled: boolean;
@@ -916,6 +923,9 @@ export const useSettingsStore = create<SettingsState>()(
         modelId: '',
         thinkingConfigs: {},
         providersConfig: getDefaultProvidersConfig(),
+        credentialStorage: 'unknown' as const,
+        credentialRole: 'user' as const,
+        credentialMeta: {},
         ttsModel: 'openai-tts',
         selectedAgentIds: ['default-1', 'default-2', 'default-3'],
         agentMode: 'auto' as const,
@@ -1996,6 +2006,34 @@ export const useSettingsStore = create<SettingsState>()(
         onWriteRefused: () => recovery.rehydrate?.(),
       }),
       version: SETTINGS_PERSIST_VERSION,
+      // Fork. Once the server holds the keys, the persisted copy must not: a
+      // real key can sit in the in-memory store for the moment between a
+      // keystroke and the server confirming it, and that moment must not be
+      // written to the browser. The sentinel is written in its place; the
+      // sync module sends the real value and replaces it in memory too.
+      partialize: (state) => {
+        if (state.credentialStorage !== 'server') return state;
+        const masked: Record<string, unknown> = { ...state };
+        for (const key of [
+          'providersConfig',
+          'ttsProvidersConfig',
+          'asrProvidersConfig',
+          'pdfProvidersConfig',
+          'imageProvidersConfig',
+          'videoProvidersConfig',
+          'webSearchProvidersConfig',
+        ] as const) {
+          const section = state[key] as Record<string, { apiKey?: string }> | undefined;
+          if (!section) continue;
+          masked[key] = Object.fromEntries(
+            Object.entries(section).map(([id, entry]) => [
+              id,
+              entry?.apiKey && entry.apiKey !== '***' ? { ...entry, apiKey: '***' } : entry,
+            ]),
+          );
+        }
+        return masked as unknown as SettingsState;
+      },
       // Migrate persisted state
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<SettingsState>;

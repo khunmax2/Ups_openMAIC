@@ -12,11 +12,12 @@ import type { ASRProviderId } from '@/lib/audio/types';
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
+import { withOwnerCredentials } from '@/lib/server/credentials/context';
 const log = createLogger('Transcription');
 
 export const maxDuration = 60;
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   let resolvedProviderId: string | undefined;
   let resolvedModelId: string | undefined;
   try {
@@ -92,3 +93,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Fork: run inside the caller's server-side credential context, so the key
+// resolvers see the owner's stored keys (see lib/server/credentials/context.ts).
+export const POST = withOwnerCredentials(handlePost);
