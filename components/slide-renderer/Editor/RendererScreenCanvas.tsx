@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { assetPath } from '@/lib/base-path';
 import { useAnimate } from 'motion/react';
 import { SlideCanvas, type SlideEffects } from '@openmaic/renderer';
 import type { PPTImageElement, PPTVideoElement } from '@openmaic/dsl';
@@ -138,8 +139,8 @@ function PlaybackVideoContent({
           ref={videoRef}
           className="h-full w-full"
           style={{ objectFit: 'contain' }}
-          src={resolvedSrc}
-          poster={resolvedPoster ?? undefined}
+          src={assetPath(resolvedSrc)}
+          poster={assetPath(resolvedPoster) ?? undefined}
           preload="metadata"
           controls
           playsInline

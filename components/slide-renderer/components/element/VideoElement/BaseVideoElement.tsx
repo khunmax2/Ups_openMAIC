@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
+import { assetPath } from '@/lib/base-path';
 import { useAnimate } from 'motion/react';
 import type { PPTVideoElement } from '@openmaic/dsl';
 import { useCanvasStore } from '@/lib/store/canvas';
@@ -166,8 +167,8 @@ export function BaseVideoElement({ elementInfo }: BaseVideoElementProps) {
             ref={videoRef}
             className="w-full h-full"
             style={{ objectFit: 'contain' }}
-            src={resolvedSrc}
-            poster={resolvedPoster ?? undefined}
+            src={assetPath(resolvedSrc)}
+            poster={assetPath(resolvedPoster) ?? undefined}
             preload="metadata"
             controls
             playsInline

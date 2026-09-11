@@ -34,6 +34,7 @@ import { useStageStore } from '@/lib/store/stage';
 import type { GeneratedAgentConfig } from '@/lib/types/stage';
 import { useAgentRoster } from './useAgentRoster';
 import { AvatarPicker } from './AvatarPicker';
+import { assetPath } from '@/lib/base-path';
 
 const PERSONA_MAX = 2000;
 
@@ -68,7 +69,7 @@ function AvatarWithOverlay({ agent, size, ringColor, onPickerOpen }: AvatarWithO
     >
       {/* Avatars are static public paths; the roster needs no image optimizer. */}
       <img
-        src={agent.avatar}
+        src={assetPath(agent.avatar)}
         alt={agent.name}
         draggable={false}
         className="rounded-full object-cover"

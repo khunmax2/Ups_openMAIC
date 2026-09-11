@@ -7,6 +7,7 @@ import { Play, Pause, X } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { DISCUSSION_AUTO_SKIP_MS } from '@/lib/choreography';
 import type { DiscussionAction } from '@/lib/types/action';
+import { assetPath } from '@/lib/base-path';
 
 interface ProactiveCardProps {
   action: DiscussionAction;
@@ -175,7 +176,7 @@ export const ProactiveCard = ({
             {agentAvatar && (
               <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-gray-100 dark:border-gray-700">
                 <img
-                  src={agentAvatar}
+                  src={assetPath(agentAvatar)}
                   alt={agentName || ''}
                   className="w-full h-full object-cover"
                 />
