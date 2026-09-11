@@ -48,7 +48,7 @@ Produce a **`courseTitle`** (required): a concise, human-readable name for the *
 
 - **Length**: ≤ 30 characters (roughly one short phrase). Hard cap; if the concept is long, compress it.
 - **Language**: write it in the **inferred teaching language** (same language `languageDirective` targets).
-- **Style**: a noun phrase summarizing the topic — e.g. "抛体运动实战", "Hands-on Recursion", "太阳系探索". Not a sentence, not a question.
+- **Style**: a noun phrase summarizing the topic — e.g. "Projectile Motion in Practice", "Hands-on Recursion", "Exploring the Solar System". Not a sentence, not a question.
 - **Do NOT** include: quotes, numbering, leading emojis, the teacher's name/role, or words like "Course"/"课程"/"A course about".
 - If the requirement is already a crisp title, you may reuse it (trimmed to the limit). If it is a long prompt, distill it to its essence.
 
@@ -201,14 +201,14 @@ For **shorter courses (<10 scenes)**:
 {
   "id": "scene_3",
   "type": "interactive",
-  "title": "精准着陆挑战",
-  "description": "控制飞船推力，安全着陆到目标区域",
-  "keyPoints": ["调节推力大小", "观察速度变化", "实现软着陆"],
+  "title": "Precision Landing Challenge",
+  "description": "Control the lander's thrust to touch down safely in the target zone",
+  "keyPoints": ["Adjust thrust", "Watch how speed changes", "Achieve a soft landing"],
   "order": 3,
   "widgetType": "game",
   "widgetOutline": {
     "gameType": "action",
-    "challenge": "控制推力使飞船以低于5m/s的速度着陆",
+    "challenge": "Land the craft at under 5 m/s by controlling thrust",
     "playerControls": ["thrust_slider"],
     "physicsConcept": "F=ma, thrust counteracts gravity"
   }
@@ -223,9 +223,9 @@ For **shorter courses (<10 scenes)**:
 {
   "id": "scene_3",
   "type": "interactive",
-  "title": "太阳系探索",
-  "description": "交互式3D太阳系模型，探索行星轨道和相对大小",
-  "keyPoints": ["行星轨道运动", "行星相对大小", "太阳系结构"],
+  "title": "Exploring the Solar System",
+  "description": "An interactive 3D model for exploring planetary orbits and relative sizes",
+  "keyPoints": ["Orbital motion", "Relative planet sizes", "Structure of the solar system"],
   "order": 3,
   "widgetType": "visualization3d",
   "widgetOutline": {

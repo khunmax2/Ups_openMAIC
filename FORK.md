@@ -228,6 +228,41 @@ DeepWitya's `learner` preset outright; that is DeepWitya's decision and lives
 in its repository, but it is why an `anon:` owner never appears here in the
 deployment.
 
+### The prompt templates show the model no Chinese output
+
+A Thai course came out with a start button reading 启动 and a fullwidth colon
+in a status label, body text otherwise correct Thai. Swapping the model did
+not help, because the model was not the cause: the templates showed it Chinese
+output — two complete worked outlines with Chinese titles and keyPoints, a
+Chinese few-shot challenge, a course-title style list in Chinese, and a
+task-engine prompt announcing the learner-facing product name as 任务引擎. A
+model told to teach in Thai copies the shape it is shown.
+
+Eleven lines across four files, and a guard:
+`tests/prompts/no-cjk-in-worked-examples.test.ts` bans CJK inside fenced
+blocks in every template while allowing it in prose. That line is deliberate.
+Chinese in prose is an example of what a learner might **say** — the
+language-inference rules, the director's frustration signals, the "用中文讲"
+requests — and those are inputs, paired with English; removing them would make
+the product worse for Chinese users. Fenced blocks are what the model reads as
+a template for its own answer. 271 CJK characters became 143, none fenced.
+
+Two things this deliberately does not do:
+
+- **It does not touch fonts.** The first attempt at this, before the fork
+  existed, swapped Microsoft YaHei for Tahoma in 19 places and broke slide
+  layout everywhere at once: every element is an absolutely positioned box on
+  a fixed 1000×562 canvas, and the model sizes those boxes for the font the
+  slide renders with. Change the font and the text changes size inside boxes
+  that stay where they were. That, not the prompt edit, was the breakage.
+- **It does not claim to finish the job.** Chinese remains in the TS-side
+  prompts (`lib/chat/pi/prompts.ts` has one fenced example, the PBL instructor
+  and planner carry more) and in `agent-system` / `director` prose. Each is a
+  separate, measured change; the guard above covers only `lib/prompts/*.md`.
+
+Reverting needs no rebuild of anything else: the templates are read with
+`fs.readFileSync` per call and ship into the image as files.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

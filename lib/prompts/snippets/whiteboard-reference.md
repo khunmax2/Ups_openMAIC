@@ -235,7 +235,7 @@ Characters at risk (first character of the LaTeX command collides with a JSON es
 | LaTeX source | ❌ Wrong in JSON | ✅ Right in JSON |
 |---|---|---|
 | `\frac{a}{b}` | `"\frac{a}{b}"` | `"\\frac{a}{b}"` |
-| `\text{合规}` | `"\text{合规}"` | `"\\text{合规}"` |
+| `\text{valid}` | `"\text{valid}"` | `"\\text{valid}"` |
 | `\theta` | `"\theta"` | `"\\theta"` |
 | `\times` | `"\times"` | `"\\times"` |
 | `\rightarrow` | `"\rightarrow"` | `"\\rightarrow"` |
