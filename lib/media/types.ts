@@ -73,6 +73,7 @@
 export type ImageProviderId =
   | 'seedream'
   | 'openai-image'
+  | 'custom-image'
   | 'qwen-image'
   | 'nano-banana'
   | 'minimax-image'

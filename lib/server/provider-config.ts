@@ -120,6 +120,7 @@ const PDF_ENV_MAP: Record<string, string> = {
 
 const IMAGE_ENV_MAP: Record<string, string> = {
   IMAGE_OPENAI: 'openai-image',
+  IMAGE_CUSTOM: 'custom-image',
   IMAGE_SEEDREAM: 'seedream',
   IMAGE_QWEN_IMAGE: 'qwen-image',
   IMAGE_NANO_BANANA: 'nano-banana',

@@ -193,6 +193,9 @@ const TEMPORARY_VENDOR_DEBT: readonly AllowedVendorDebt[] = [
       ['unpdf', 2],
       ['mineru', 5],
       ['seedream', 2],
+      // Fork: the env-prefix map entry for the OpenAI-compatible image
+      // provider. Its id is generic parts only, so the whole id is the term.
+      ['custom-image', 1],
       ['banana', 2],
       ['nano', 2],
       ['seedance', 2],
