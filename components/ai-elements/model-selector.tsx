@@ -12,6 +12,7 @@ import {
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { ComponentProps, ReactNode } from 'react';
+import { assetPath } from '@/lib/base-path';
 
 export type ModelSelectorProps = ComponentProps<typeof Dialog>;
 
@@ -146,7 +147,7 @@ export const ModelSelectorLogo = ({ provider, className, ...props }: ModelSelect
     alt={`${provider} logo`}
     className={cn('size-3 dark:invert', className)}
     height={12}
-    src={`https://models.dev/logos/${provider}.svg`}
+    src={assetPath(`https://models.dev/logos/${provider}.svg`)}
     width={12}
   />
 );

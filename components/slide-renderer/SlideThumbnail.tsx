@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties, ReactNode } from 'react';
+import { assetPath } from '@/lib/base-path';
 import { Play, RotateCcw } from 'lucide-react';
 import type { Slide, PPTImageElement, PPTVideoElement } from '@openmaic/dsl';
 import { SlideCanvas } from '@openmaic/renderer';
@@ -72,8 +73,8 @@ function renderThumbnailVideo(
         <video
           className="w-full h-full"
           style={{ objectFit: 'contain' }}
-          src={src}
-          poster={element.poster}
+          src={assetPath(src)}
+          poster={assetPath(element.poster)}
           preload="metadata"
           muted
           playsInline

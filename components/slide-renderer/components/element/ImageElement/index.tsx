@@ -18,6 +18,7 @@ import { useSceneData } from '@/lib/contexts/scene-context';
 import type { SlideContent } from '@/lib/types/stage';
 import { mediaRetryTarget, retryMediaTask } from '@/lib/media/media-orchestrator';
 import { mediaResolutionCanRetry } from '@/lib/media/resolve-media-ref';
+import { assetPath } from '@/lib/base-path';
 
 export interface ImageElementProps {
   elementInfo: PPTImageElement;
@@ -181,7 +182,7 @@ export function ImageElement({ elementInfo, selectElement }: ImageElementProps) 
                 </div>
               ) : resolvedSrc ? (
                 <img
-                  src={resolvedSrc}
+                  src={assetPath(resolvedSrc)}
                   draggable={false}
                   style={{
                     position: 'absolute',

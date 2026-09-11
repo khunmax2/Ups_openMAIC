@@ -13,6 +13,7 @@ import { useI18n } from '@/lib/hooks/use-i18n';
 import { useSceneData } from '@/lib/contexts/scene-context';
 import type { SlideContent } from '@/lib/types/stage';
 import { mediaResolutionCanRetry } from '@/lib/media/resolve-media-ref';
+import { assetPath } from '@/lib/base-path';
 
 export interface BaseImageElementProps {
   elementInfo: PPTImageElement;
@@ -117,7 +118,7 @@ export function BaseImageElement({ elementInfo }: BaseImageElementProps) {
             ) : resolvedSrc ? (
               <>
                 <img
-                  src={resolvedSrc}
+                  src={assetPath(resolvedSrc)}
                   draggable={false}
                   style={{
                     position: 'absolute',

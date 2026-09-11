@@ -66,6 +66,7 @@ import { AddAudioProviderDialog, type NewAudioProviderData } from './add-audio-p
 import { isCustomTTSProvider, isCustomASRProvider } from '@/lib/audio/types';
 import { resolveASRProviderName, resolveTTSProviderName } from '@/lib/audio/provider-display';
 import type { SettingsSection, EditingModel } from '@/lib/types/settings';
+import { assetPath } from '@/lib/base-path';
 
 // ─── Provider List Column (reusable) ───
 function ProviderListColumn<T extends string>({
@@ -101,7 +102,7 @@ function ProviderListColumn<T extends string>({
           >
             {provider.icon ? (
               <img
-                src={provider.icon}
+                src={assetPath(provider.icon)}
                 alt={provider.name}
                 className={cn(
                   'w-5 h-5 rounded',
@@ -570,7 +571,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
             <>
               {selectedProvider.icon ? (
                 <img
-                  src={selectedProvider.icon}
+                  src={assetPath(selectedProvider.icon)}
                   alt={selectedProvider.name}
                   className={cn(
                     'w-8 h-8 rounded',
@@ -605,7 +606,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           <>
             {pdfProvider.icon ? (
               <img
-                src={pdfProvider.icon}
+                src={assetPath(pdfProvider.icon)}
                 alt={pdfProvider.name}
                 className="w-8 h-8 rounded"
                 onError={(e) => {
@@ -626,7 +627,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           <>
             {wsProvider.icon ? (
               <img
-                src={wsProvider.icon}
+                src={assetPath(wsProvider.icon)}
                 alt={wsProvider.name}
                 className="w-8 h-8 rounded"
                 onError={(e) => {
@@ -649,7 +650,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           <>
             {imgIcon ? (
               <img
-                src={imgIcon}
+                src={assetPath(imgIcon)}
                 alt={imgProvider?.name}
                 className="w-8 h-8 rounded"
                 onError={(e) => {
@@ -672,7 +673,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           <>
             {vidIcon ? (
               <img
-                src={vidIcon}
+                src={assetPath(vidIcon)}
                 alt={vidProvider?.name}
                 className="w-8 h-8 rounded"
                 onError={(e) => {
@@ -694,7 +695,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           <>
             {ttsIcon ? (
               <img
-                src={ttsIcon}
+                src={assetPath(ttsIcon)}
                 alt=""
                 className="w-8 h-8 rounded"
                 onError={(e) => {
@@ -714,7 +715,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           <>
             {asrIcon ? (
               <img
-                src={asrIcon}
+                src={assetPath(asrIcon)}
                 alt=""
                 className="w-8 h-8 rounded"
                 onError={(e) => {

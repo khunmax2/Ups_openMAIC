@@ -94,6 +94,16 @@ describe('no bare same-origin request paths', () => {
     // so a bare one asks the origin root -- 126 requests for /logos/*.svg
     // answered 404 on the first run, and a broken image reports nothing.
     /<(?:img|Image|motion\.img)\b[^>]{0,200}?\bsrc=['"]\//gu,
+    // The same element with a src that travels as a VARIABLE. The literal
+    // pattern above reported a clean tree while `<AvatarImage src={avatar}>`
+    // was asking the origin root for /avatars/clown.png (the model picks the
+    // path from a list) and `<img src={provider.icon}>` for /logos/*.svg --
+    // every avatar and every provider logo in the product, 404. assetPath()
+    // is idempotent and leaves a non-absolute value alone, so wrapping is
+    // always safe; a bare `src={x}` on these tags is therefore always wrong.
+    // AvatarImage prefixes internally now; the primitive it wraps is listed
+    // so a raw use of it is caught too. Iframes are not media and are left out.
+    /<(?:img|motion\.img|video|source|AvatarPrimitive\.Image)\b[^>]{0,400}?\bsrc=\{(?!\s*(?:assetPath|apiPath)\(|\s*typeof )/gu,
   ];
 
   /**
@@ -165,5 +175,13 @@ describe('no bare same-origin request paths', () => {
     // in the product.
     expect(hits('<motion.img src="/logo-horizontal.png" alt="" />')).toBe(1);
     expect(hits('<img src={assetPath(brand.logoSrc)} alt="" />')).toBe(0);
+    expect(hits('<img src={agent.avatar} alt="" />')).toBe(1);
+    expect(hits('<video className="x"\n  src={resolvedSrc}\n/>')).toBe(1);
+    expect(hits('<AvatarPrimitive.Image src={src} />')).toBe(1);
+    expect(
+      hits('<AvatarPrimitive.Image src={typeof src === "string" ? assetPath(src) : src} />'),
+    ).toBe(0);
+    expect(hits('<video src={assetPath(resolvedSrc)} />')).toBe(0);
+    expect(hits('<iframe src={entry.src} />')).toBe(0);
   });
 });

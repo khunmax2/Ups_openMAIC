@@ -6,6 +6,7 @@ import { KEYS } from '@/configs/hotkey';
 import { OperateResizeHandlers } from '@/lib/types/edit';
 import type { ImageClipedEmitData } from '@/lib/types/edit';
 import type { ImageClipDataRange, ImageElementClip } from '@openmaic/dsl';
+import { assetPath } from '@/lib/base-path';
 
 export interface ImageClipHandlerProps {
   src: string;
@@ -510,7 +511,7 @@ export function ImageClipHandler({
     >
       <img
         className="bottom-img absolute top-0 left-0 w-full h-full opacity-50"
-        src={src}
+        src={assetPath(src)}
         draggable={false}
         alt=""
         style={bottomImgPositionStyle}
@@ -525,7 +526,7 @@ export function ImageClipHandler({
       >
         <img
           className="top-img absolute w-full h-full"
-          src={src}
+          src={assetPath(src)}
           draggable={false}
           alt=""
           style={topImgPositionStyle}
