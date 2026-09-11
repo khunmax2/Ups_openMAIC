@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/hooks/use-i18n';
 import type { ProviderId, ProviderConfig } from '@/lib/ai/providers';
 import { MONO_LOGO_PROVIDERS } from '@/lib/ai/providers';
 import { assetPath } from '@/lib/base-path';
+import { CredentialDefaultBadge } from './credential-default-badge';
 
 interface ProviderWithServerInfo extends ProviderConfig {
   isServerConfigured?: boolean;
@@ -74,6 +75,7 @@ export function ProviderList({
                 {t('settings.serverConfigured')}
               </span>
             )}
+            <CredentialDefaultBadge section="providers" providerId={provider.id} />
           </button>
         ))}
       </div>

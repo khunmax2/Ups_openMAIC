@@ -1393,6 +1393,7 @@
     "apiKeyRemove": "Remove my API key",
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
+    "credentialDefaultBadge": "System default",
     "enterCustomBaseUrl": "カスタムベースURLを入力",
     "browserNativeNote": "ブラウザネイティブASRは設定不要で完全無料です",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

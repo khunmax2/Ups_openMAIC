@@ -1393,6 +1393,7 @@
     "apiKeyRemove": "Remove my API key",
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
+    "credentialDefaultBadge": "System default",
     "enterCustomBaseUrl": "Saisissez une URL de base personnalisée",
     "browserNativeNote": "La reconnaissance vocale native du navigateur ne demande aucune configuration et est entièrement gratuite",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",
