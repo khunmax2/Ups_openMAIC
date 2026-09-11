@@ -129,16 +129,17 @@ export function ApiKeyField({
     const masked = value === CREDENTIAL_SENTINEL && meta ? meta.masked : maskApiKey(value);
     const fromDefault = value === CREDENTIAL_SENTINEL && meta?.source === 'default';
     const own = value === CREDENTIAL_SENTINEL && meta?.source === 'own';
+    const shared = fromDefault || isShared;
     return (
       <div className={cn('flex flex-col gap-1', className)}>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Input
             name={name}
             type="text"
             readOnly
             disabled={disabled}
             value={masked}
-            className="h-8 flex-1 font-mono text-muted-foreground"
+            className="h-8 min-w-[9rem] flex-1 font-mono text-muted-foreground"
             aria-label={t('settings.apiKeyStored')}
           />
           <Button
@@ -167,11 +168,13 @@ export function ApiKeyField({
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
-          {own && credential && role === 'admin' && serverBacked && (
-            // The admin's actions on their own key -- share it with every
-            // account, stop sharing, remove it -- in one menu on the key's
-            // row. Sharing is the one admin-only action in the studio, so
-            // its state is also shown without opening the menu.
+          {(own || fromDefault) && credential && role === 'admin' && serverBacked && (
+            // The admin's actions on this provider's key -- share their own
+            // with every account, stop sharing, remove their own -- in one
+            // menu on the key's row. Sharing is the one admin-only action in
+            // the studio, so its state is also shown without opening the
+            // menu. An admin who removed their own key while it was shared
+            // still sees the shared one here, and keeps the way to stop it.
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -182,13 +185,13 @@ export function ApiKeyField({
                   disabled={disabled || busy}
                   aria-label={t('settings.apiKeyActions')}
                 >
-                  <Users className={cn('h-3.5 w-3.5', isShared && 'text-primary')} />
-                  {isShared ? t('settings.apiKeySharedShort') : null}
+                  <Users className={cn('h-3.5 w-3.5', shared && 'text-primary')} />
+                  {shared ? t('settings.apiKeySharedShort') : null}
                   <ChevronDown className="h-3 w-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[260px]">
-                {isShared ? (
+                {shared ? (
                   <>
                     <DropdownMenuLabel className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
                       <Check className="h-3.5 w-3.5 text-primary" />
@@ -196,7 +199,12 @@ export function ApiKeyField({
                     </DropdownMenuLabel>
                     <DropdownMenuItem className="gap-2" onClick={() => void stopSharing()}>
                       <Users className="h-3.5 w-3.5" />
-                      {t('settings.apiKeyStopSharing')}
+                      <span className="flex flex-col">
+                        <span>{t('settings.apiKeyStopSharing')}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {t('settings.apiKeyStopSharingHint')}
+                        </span>
+                      </span>
                     </DropdownMenuItem>
                   </>
                 ) : (
@@ -210,14 +218,25 @@ export function ApiKeyField({
                     </span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="gap-2 text-destructive focus:text-destructive"
-                  onClick={() => void removeOwn()}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {t('settings.apiKeyRemove')}
-                </DropdownMenuItem>
+                {own && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="gap-2 text-destructive focus:text-destructive"
+                      onClick={() => void removeOwn()}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span className="flex flex-col">
+                        <span>{t('settings.apiKeyRemove')}</span>
+                        {isShared && (
+                          <span className="text-[11px] font-normal text-muted-foreground">
+                            {t('settings.apiKeyRemoveKeepsShared')}
+                          </span>
+                        )}
+                      </span>
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -225,7 +244,9 @@ export function ApiKeyField({
         {serverBacked && fromDefault && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Users className="h-3.5 w-3.5" />
-            <span>{t('settings.apiKeyFromShared')}</span>
+            <span>
+              {role === 'admin' ? t('settings.apiKeySharedNoOwn') : t('settings.apiKeyFromShared')}
+            </span>
           </div>
         )}
       </div>
