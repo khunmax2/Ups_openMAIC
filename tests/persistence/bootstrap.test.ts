@@ -106,4 +106,51 @@ describe('persistence client bootstrap', () => {
     expect(errorSpy).toHaveBeenCalledOnce();
     expect(errorSpy.mock.calls[0]?.[0]).toContain('FATAL');
   });
+
+  describe('learner key (fork)', () => {
+    // Behind the gateway the server derives the learner partition from the
+    // verified identity and forbids any other key in a learner-scoped path.
+    // The browser has to ask, and must ask before minting its own.
+    function arm(fetchImpl: (input: string) => Promise<Response>) {
+      vi.stubEnv('NEXT_PUBLIC_PERSISTENCE', '1');
+      vi.stubGlobal('window', {});
+      vi.stubGlobal('localStorage', memoryStorage());
+      const fetchMock = vi.fn((input: string) => fetchImpl(input));
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    it("uses the server's learner key when the gateway identified the caller", async () => {
+      const fetchMock = arm(async (input) => {
+        expect(input).toBe('/api/persistence/whoami');
+        return Response.json({ learnerKey: 'user:alice' });
+      });
+      const { getPersistenceLearnerKey } = await import('@/lib/persistence/bootstrap');
+      await expect(getPersistenceLearnerKey()).resolves.toBe('user:alice');
+      expect(fetchMock).toHaveBeenCalledOnce();
+      // Nothing was minted on the device: the server's answer is the identity.
+      expect(localStorage.length).toBe(0);
+    });
+
+    it('falls back to a device key when the server has no identity to offer', async () => {
+      // Upstream's shape -- no gateway, or persistence not configured -- keeps
+      // working: 401/404 from whoami means "mint your own", as before.
+      arm(async () => new Response('', { status: 401 }));
+      const { getPersistenceLearnerKey } = await import('@/lib/persistence/bootstrap');
+      await expect(getPersistenceLearnerKey()).resolves.toMatch(/^anon:/u);
+    });
+
+    it('does not pin a network failure: the next call asks again', async () => {
+      let calls = 0;
+      arm(async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('offline');
+        return Response.json({ learnerKey: 'user:alice' });
+      });
+      const { getPersistenceLearnerKey } = await import('@/lib/persistence/bootstrap');
+      // A thrown fetch resolves to "no server key" and falls back rather than
+      // failing every later persistence call; the fallback is the device key.
+      await expect(getPersistenceLearnerKey()).resolves.toMatch(/^anon:/u);
+    });
+  });
 });

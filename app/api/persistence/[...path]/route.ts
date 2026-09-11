@@ -15,7 +15,7 @@ import {
   type DocumentAccess,
 } from '@/lib/persistence/document-access';
 import { createOwnerBoundDocumentStore } from '@/lib/persistence/owner-bound-document-store';
-import { authenticatePersistenceRequest } from '@/lib/persistence/server-auth';
+import { authenticatePersistenceRequest, learnerKeyForOwner } from '@/lib/persistence/server-auth';
 import { readStudioOwnerId, studioGatewayRequired } from '@/lib/server/studio-identity';
 import {
   getServerPersistenceProvider,
@@ -284,6 +284,15 @@ export async function handlePersistenceRequest(
   }
 
   return withRequestOwnerId(request, async (ownerId, responseHeaders) => {
+    // Fork. Answers "which learner partition am I" from the verified identity,
+    // so the browser can address learner-scoped runtime paths
+    // (`/runtime/stages/{id}/learners/{learnerKey}/...`) with the key the
+    // policy will accept. Needs no database: it is a function of the header.
+    if (request.method === 'GET' && routeRelativePath(request) === '/whoami') {
+      const response = Response.json({ learnerKey: learnerKeyForOwner(ownerId) });
+      for (const [name, value] of responseHeaders.entries()) response.headers.append(name, value);
+      return response;
+    }
     try {
       const path = routeRelativePath(request);
       const action = parseDocumentAction(request.method, path);

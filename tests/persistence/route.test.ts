@@ -52,6 +52,34 @@ describe('embedded persistence route', () => {
     expect(response.status).toBe(401);
   });
 
+  it('answers whoami from the verified identity without touching the database', async () => {
+    // Fork. The connection string is deliberately unusable: reaching the pool
+    // would surface as a 500, which is how this asserts the answer comes from
+    // the header alone.
+    vi.stubEnv('DATABASE_URL', 'postgres://unused-in-this-test');
+    vi.stubEnv('STUDIO_REQUIRE_GATEWAY', '1');
+    const { GET } = await import('@/app/api/persistence/[...path]/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/persistence/whoami', {
+        headers: { 'x-deeptutor-owner': 'user:alice' },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ learnerKey: 'user:alice' });
+  });
+
+  it('refuses whoami like every other path when the gateway said nothing', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://unused-in-this-test');
+    vi.stubEnv('STUDIO_REQUIRE_GATEWAY', '1');
+    const { GET } = await import('@/app/api/persistence/[...path]/route');
+
+    const response = await GET(new Request('http://localhost/api/persistence/whoami'));
+
+    expect(response.status).toBe(401);
+  });
+
   it('still serves an anonymous visitor when no gateway is required', async () => {
     // Upstream's shape, kept runnable: with STUDIO_REQUIRE_GATEWAY unset the
     // route falls through to the anonymous cookie identity, so this fork can
