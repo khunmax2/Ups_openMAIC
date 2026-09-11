@@ -65,7 +65,7 @@ export function metaKey(section: CredentialSection, providerId: string): string 
   return `${section}:${providerId}`;
 }
 
-type Entry = { apiKey?: string; baseUrl?: string };
+type Entry = { apiKey?: string; baseUrl?: string; enabled?: boolean };
 
 /** What PUT accepts: the fields, or an admin's request to copy their own row. */
 export type CredentialPatch = Entry & { copyFromOwner?: boolean };
@@ -153,17 +153,26 @@ function reconcileSection(
   entries: Record<string, Entry>,
   section: CredentialSection,
   meta: CredentialMeta,
+  previousMeta: CredentialMeta,
 ): Record<string, Entry> {
   const next: Record<string, Entry> = {};
   for (const [id, entry] of Object.entries(entries)) {
-    const stored = meta[metaKey(section, id)];
+    const key = metaKey(section, id);
+    const stored = meta[key];
     if (stored) {
+      // A provider this browser is seeing a credential for the FIRST time --
+      // typically an admin default for an account that never configured it --
+      // is switched on, the way typing a key switches it on. Only the first
+      // time: a person who turned it off afterwards has said so, and their
+      // answer survives every later boot.
+      const firstSeen = !previousMeta[key];
       next[id] = {
         ...entry,
         apiKey: CREDENTIAL_SENTINEL,
         // The server's base URL is what the key is used with; an empty one
         // means the provider's default, which the page already knows.
         ...(stored.baseUrl ? { baseUrl: stored.baseUrl } : {}),
+        ...(firstSeen && entry.enabled === false ? { enabled: true } : {}),
       };
     } else if (entry.apiKey === CREDENTIAL_SENTINEL) {
       // Removed elsewhere (another browser, an admin): nothing stands behind
@@ -188,6 +197,7 @@ function applyMeta(meta: CredentialMeta, role: 'admin' | 'user') {
         sectionEntries(state, section),
         section,
         meta,
+        state.credentialMeta ?? {},
       );
     }
     return patch;

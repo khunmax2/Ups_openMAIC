@@ -159,6 +159,31 @@ describe('server-side credentials, browser half', () => {
     expect(calls.filter((c) => c.method !== 'GET')).toHaveLength(0);
   });
 
+  it('switches a provider on the first time a credential appears for it, and only then', async () => {
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    // An account that never configured image generation: the provider row
+    // exists with upstream's default, enabled: false.
+    expect(useSettingsStore.getState().imageProvidersConfig['custom-image']?.enabled).toBe(false);
+
+    fakeServer({
+      defaults: {
+        image: { 'custom-image': { masked: 'sk-ad••••min1', baseUrl: 'https://gpu/v1' } },
+      },
+    });
+    const mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+    const first = useSettingsStore.getState().imageProvidersConfig['custom-image'];
+    expect(first).toMatchObject({ apiKey: '***', enabled: true, baseUrl: 'https://gpu/v1' });
+
+    // The person turns it off. A later boot sees the same default -- not for
+    // the first time -- and leaves their answer alone.
+    useSettingsStore.getState().setImageProviderConfig('custom-image', { enabled: false });
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+    expect(useSettingsStore.getState().imageProvidersConfig['custom-image']?.enabled).toBe(false);
+  });
+
   it('never persists a real key once the server holds them', async () => {
     fakeServer({});
     const { useSettingsStore } = await import('@/lib/store/settings');

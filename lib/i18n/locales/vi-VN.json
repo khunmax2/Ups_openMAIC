@@ -1393,6 +1393,7 @@
     "apiKeyRemove": "Remove my API key",
     "apiKeyFromDefault": "Using the administrator's default",
     "apiKeySetDefault": "Set as the system default",
+    "credentialDefaultBadge": "System default",
     "enterCustomBaseUrl": "Nhập địa chỉ gốc tùy chỉnh",
     "browserNativeNote": "Nhận dạng giọng nói của trình duyệt không cần cấu hình gì và hoàn toàn miễn phí",
     "providerOpenAITTS": "OpenAI TTS (gpt-4o-mini-tts)",

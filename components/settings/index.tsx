@@ -38,6 +38,8 @@ import { PROVIDERS, MONO_LOGO_PROVIDERS } from '@/lib/ai/providers';
 import { cn } from '@/lib/utils';
 import { createCustomProviderSettings, getProviderTypeLabel, modelInfoFromId } from './utils';
 import { ProviderList } from './provider-list';
+import { CredentialDefaultBadge } from './credential-default-badge';
+import type { CredentialSection } from '@/lib/credentials/client';
 import { ProviderConfigPanel } from './provider-config-panel';
 import { PDFSettings } from './pdf-settings';
 import { PDF_PROVIDERS } from '@/lib/pdf/constants';
@@ -77,6 +79,7 @@ function ProviderListColumn<T extends string>({
   width,
   t,
   onAdd,
+  credentialSection,
 }: {
   providers: Array<{ id: T; name: string; icon?: string }>;
   configs: Record<string, { isServerConfigured?: boolean }>;
@@ -85,6 +88,8 @@ function ProviderListColumn<T extends string>({
   width: number;
   t: (key: string) => string;
   onAdd?: () => void;
+  /** Fork: which server-side credential section this column lists. */
+  credentialSection?: CredentialSection;
 }) {
   return (
     <div className="flex-shrink-0 bg-background flex flex-col" style={{ width }}>
@@ -120,6 +125,9 @@ function ProviderListColumn<T extends string>({
               <span className="text-[10px] px-1 py-0 h-4 leading-4 rounded shrink-0 bg-muted text-muted-foreground">
                 {t('settings.serverConfigured')}
               </span>
+            )}
+            {credentialSection && (
+              <CredentialDefaultBadge section={credentialSection} providerId={provider.id} />
             )}
           </button>
         ))}
@@ -903,6 +911,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           {activeSection === 'pdf' && (
             <>
               <ProviderListColumn
+                credentialSection="pdf"
                 providers={Object.values(PDF_PROVIDERS)}
                 configs={pdfProvidersConfig}
                 selectedId={selectedPdfProviderId}
@@ -922,6 +931,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           {activeSection === 'web-search' && (
             <>
               <ProviderListColumn
+                credentialSection="webSearch"
                 providers={Object.values(WEB_SEARCH_PROVIDERS).map((provider) => ({
                   ...provider,
                   name: getWebSearchProviderDisplayName(provider.id, t),
@@ -944,6 +954,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           {activeSection === 'image' && (
             <>
               <ProviderListColumn
+                credentialSection="image"
                 providers={Object.values(IMAGE_PROVIDERS).map((p) => ({
                   id: p.id,
                   name: t(`settings.${IMAGE_PROVIDER_NAMES[p.id]}`) || p.name,
@@ -967,6 +978,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           {activeSection === 'video' && (
             <>
               <ProviderListColumn
+                credentialSection="video"
                 providers={Object.values(VIDEO_PROVIDERS).map((p) => ({
                   id: p.id,
                   name: t(`settings.${VIDEO_PROVIDER_NAMES[p.id]}`) || p.name,
@@ -990,6 +1002,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           {activeSection === 'tts' && (
             <>
               <ProviderListColumn
+                credentialSection="tts"
                 providers={[
                   ...Object.values(TTS_PROVIDERS).map((p) => ({
                     id: p.id,
@@ -1023,6 +1036,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           {activeSection === 'asr' && (
             <>
               <ProviderListColumn
+                credentialSection="asr"
                 providers={[
                   ...Object.values(ASR_PROVIDERS).map((p) => ({
                     id: p.id,
