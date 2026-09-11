@@ -106,7 +106,10 @@ export async function testOpenAICompatibleImageConnectivity(
       };
     }
 
-    return { success: false, message: `${NAME} API error (${list.status}): ${await bodyText(list)}` };
+    return {
+      success: false,
+      message: `${NAME} API error (${list.status}): ${await bodyText(list)}`,
+    };
   } catch (err) {
     return { success: false, message: `${NAME} connectivity error: ${err}` };
   }
@@ -141,7 +144,9 @@ export async function generateWithOpenAICompatibleImage(
   });
 
   if (!response.ok) {
-    throw new Error(`${NAME} image generation failed (${response.status}): ${await bodyText(response)}`);
+    throw new Error(
+      `${NAME} image generation failed (${response.status}): ${await bodyText(response)}`,
+    );
   }
 
   const data = await response.json();
