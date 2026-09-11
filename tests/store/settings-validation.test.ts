@@ -4,6 +4,7 @@ import {
   validateProvider,
   validateModel,
   resolveSelectedModel,
+  resolveProbeModel,
   hasUsableLLMProvider,
   isLLMProviderConfigured,
   type ProviderCfgLike,
@@ -183,6 +184,39 @@ describe('resolveSelectedModel', () => {
     for (const current of ['', 'unknown', 'glm-4']) {
       expect(resolveSelectedModel(current, [{ id: 'glm-4' }])).not.toBe('');
     }
+  });
+});
+
+describe('resolveProbeModel', () => {
+  const catalogue = [{ id: 'gpt-image-2' }, { id: 'gpt-image-1' }];
+
+  it('keeps the active model when the viewed provider has it', () => {
+    expect(resolveProbeModel('gpt-image-1', catalogue)).toBe('gpt-image-1');
+  });
+
+  it("falls back to the viewed provider's own first model when the active one is another provider's", () => {
+    // The observed case: OpenAI Image is active (gpt-image-2), the page is
+    // on OpenAI Compatible, whose only model is the operator's custom entry.
+    expect(
+      resolveProbeModel('gpt-image-2', [], { customModels: [{ id: 'qwen-image-2512' }] }),
+    ).toBe('qwen-image-2512');
+  });
+
+  it('prefers a custom entry the active model names', () => {
+    expect(resolveProbeModel('mine', catalogue, { customModels: [{ id: 'mine' }] })).toBe('mine');
+  });
+
+  it('honours replaceBuiltInModels', () => {
+    expect(
+      resolveProbeModel('gpt-image-2', catalogue, {
+        customModels: [{ id: 'only' }],
+        replaceBuiltInModels: true,
+      }),
+    ).toBe('only');
+  });
+
+  it('is empty when the viewed provider has no models at all', () => {
+    expect(resolveProbeModel('gpt-image-2', [])).toBe('');
   });
 });
 
