@@ -106,4 +106,53 @@ describe('openai-image-adapter', () => {
     expect(result.success).toBe(false);
     expect(result.message).toBe('OpenAI Image model not found: gpt-image-unknown');
   });
+
+  // An OpenAI-compatible server (vLLM, LiteLLM, a self-hosted image endpoint)
+  // commonly serves `/models` and `/images/generations` and no per-model route,
+  // so `/models/{id}` is 404 for every model including the ones it serves.
+  describe('when the per-model route is missing', () => {
+    const notFound = () => ({ ok: false, status: 404, text: async () => 'Not Found' });
+    const list = (ids: string[]) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: ids.map((id) => ({ id })) }),
+    });
+    const probe = () =>
+      testOpenAIImageConnectivity({
+        providerId: 'openai-image',
+        apiKey: 'sk-test',
+        baseUrl: 'https://gpu.example.net/qwen-image/v1',
+        model: 'qwen-image-2512',
+      });
+
+    it('accepts a model the list route names', async () => {
+      mockFetch.mockResolvedValueOnce(notFound()).mockResolvedValueOnce(list(['qwen-image-2512']));
+      const result = await probe();
+      expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://gpu.example.net/qwen-image/v1/models', {
+        redirect: 'manual',
+        headers: { Authorization: 'Bearer sk-test' },
+      });
+      expect(result).toEqual({ success: true, message: 'Connected to OpenAI Image' });
+    });
+
+    it('names what the server does serve when the model is not among them', async () => {
+      mockFetch.mockResolvedValueOnce(notFound()).mockResolvedValueOnce(list(['flux-1', 'sdxl']));
+      const result = await probe();
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        'OpenAI Image model not found: qwen-image-2512 (server lists: flux-1, sdxl)',
+      );
+    });
+
+    it('keeps the original verdict when the list route is unusable too', async () => {
+      mockFetch
+        .mockResolvedValueOnce(notFound())
+        .mockResolvedValueOnce({ ok: false, status: 401, text: async () => 'Unauthorized' });
+      const result = await probe();
+      expect(result).toEqual({
+        success: false,
+        message: 'OpenAI Image model not found: qwen-image-2512',
+      });
+    });
+  });
 });

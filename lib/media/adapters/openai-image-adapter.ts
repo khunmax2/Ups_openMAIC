@@ -48,14 +48,50 @@ export async function testOpenAIImageConnectivity(
       return { success: false, message: `OpenAI Image auth failed (${response.status}): ${text}` };
     }
     if (response.status === 404) {
-      return {
-        success: false,
-        message: `OpenAI Image model not found: ${config.model || DEFAULT_MODEL}`,
-      };
+      return probeModelList(baseUrl, config.apiKey, config.model || DEFAULT_MODEL);
     }
     return { success: false, message: `OpenAI Image API error (${response.status}): ${text}` };
   } catch (err) {
     return { success: false, message: `OpenAI Image connectivity error: ${err}` };
+  }
+}
+
+/**
+ * `GET /models/{id}` answered 404. On api.openai.com that means the model does
+ * not exist; on an OpenAI-compatible server it more often means the server
+ * never implemented the per-model route at all (vLLM, LiteLLM and most
+ * self-hosted image endpoints serve `/models` and `/images/generations` and
+ * nothing else). Ask the list route before deciding: a 200 that names the
+ * model is a working provider, a 200 that does not is a genuinely unknown
+ * model, and anything else keeps the original verdict.
+ */
+async function probeModelList(
+  baseUrl: string,
+  apiKey: string | undefined,
+  model: string,
+): Promise<{ success: boolean; message: string }> {
+  const notFound = { success: false, message: `OpenAI Image model not found: ${model}` };
+  try {
+    const response = await fetch(`${baseUrl}/models`, {
+      redirect: 'manual',
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!response?.ok) return notFound;
+    const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
+    const ids = (body.data ?? [])
+      .map((entry) => entry?.id)
+      .filter((id): id is string => typeof id === 'string');
+    if (ids.includes(model)) {
+      return { success: true, message: 'Connected to OpenAI Image' };
+    }
+    return {
+      success: false,
+      message: ids.length
+        ? `OpenAI Image model not found: ${model} (server lists: ${ids.join(', ')})`
+        : notFound.message,
+    };
+  } catch {
+    return notFound;
   }
 }
 

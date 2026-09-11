@@ -116,11 +116,26 @@ RUN if [ -n "$ALPINE_MIRROR" ]; then \
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# Fork addition. docker-compose.yml mounts a named volume here, and Docker
+# seeds a fresh named volume with the ownership of the image path it covers --
+# so when the path does not exist in the image, the mount point is created
+# root-owned and `nextjs` cannot write its own data directory. Classrooms,
+# materials and usage all land here; usage swallows the EACCES with a warning
+# every few seconds, the others do not. A volume created before this line keeps
+# its root ownership and needs a one-off `chown 1001:1001 /app/data`.
+RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
+
+# Fork addition. sharp needs libvips beside it, and the standalone tracer has
+# already shipped one image without it (see next.config.ts). The runtime only
+# notices at boot, in a log line, and then runs without its job runner. Make
+# the build notice instead.
+RUN node -e "require('sharp')"
 
 EXPOSE 3000
 
