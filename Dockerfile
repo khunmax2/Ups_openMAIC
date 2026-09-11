@@ -1,15 +1,20 @@
 # syntax=docker/dockerfile:1
 
 # ---- Stage 1: Base ----
-FROM node:22-alpine AS base
+# Fork: Debian (glibc), not Alpine (musl). Not a preference -- a measurement.
+# The studio calls operator endpoints by hostname, and musl's getaddrinfo
+# refuses a name whose AAAA query answers NXDOMAIN while its A query answers
+# records. Tailscale Funnel names do exactly that. Same resolver, same name,
+# six lookups each: node:22-bookworm-slim 6/6, node:22-alpine 0/6 (ENOTFOUND).
+# In the product that was the SSRF guard answering "Unable to verify hostname
+# safety" and image generation stopping after the fourth picture -- for a
+# server every other client on the network reached. glibc tolerates the
+# broken answer, as the Windows and macOS resolvers do. ALPINE_MIRROR is
+# accepted and ignored so existing build invocations keep working.
+FROM node:22-bookworm-slim AS base
 
 ARG ALPINE_MIRROR=""
 ARG NPM_REGISTRY=""
-
-RUN if [ -n "$ALPINE_MIRROR" ]; then \
-      sed -i "s|dl-cdn.alpinelinux.org|$ALPINE_MIRROR|g" /etc/apk/repositories; \
-    fi && \
-    apk add --no-cache libc6-compat
 
 RUN npm_registry="$NPM_REGISTRY"; \
     while [ "${npm_registry%/}" != "$npm_registry" ]; do \
@@ -28,8 +33,13 @@ FROM base AS deps
 
 ARG NPM_REGISTRY
 
-# Native build tools for sharp, @napi-rs/canvas
-RUN apk add --no-cache python3 build-base g++ cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
+# Native build tools for sharp, @napi-rs/canvas (Debian names of what the
+# Alpine stage installed).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      python3 build-essential pkg-config \
+      libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/ ./packages/
@@ -84,8 +94,9 @@ COPY --from=deps /app/public/vendor ./public/vendor
 RUN pnpm build
 
 # ---- Stage 4: Runner ----
-FROM node:22-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 
+# Accepted and ignored; see the base stage.
 ARG ALPINE_MIRROR=""
 
 # Fork addition, and it has to be here as well as in the builder. Next inlines
@@ -104,17 +115,13 @@ ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
-RUN if [ -n "$ALPINE_MIRROR" ]; then \
-      cp /etc/apk/repositories /tmp/apk.repositories; \
-      sed -i "s|dl-cdn.alpinelinux.org|$ALPINE_MIRROR|g" /etc/apk/repositories; \
-    fi && \
-    apk add --no-cache libc6-compat cairo pango jpeg giflib librsvg && \
-    if [ -n "$ALPINE_MIRROR" ]; then \
-      mv /tmp/apk.repositories /etc/apk/repositories; \
-    fi
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --home-dir /app --shell /usr/sbin/nologin nextjs
 
 # Fork addition. docker-compose.yml mounts a named volume here, and Docker
 # seeds a fresh named volume with the ownership of the image path it covers --
@@ -136,6 +143,11 @@ USER nextjs
 # notices at boot, in a log line, and then runs without its job runner. Make
 # the build notice instead.
 RUN node -e "require('sharp')"
+
+# Fork. The base-image decision, asserted where it would regress: the runtime
+# must resolve names through glibc (see the base stage). An `alpine` tag put
+# back by an upstream sync would pass every other step and fail this one.
+RUN ldd --version 2>&1 | head -1 | grep -qi "glibc\|GNU libc"
 
 EXPOSE 3000
 
