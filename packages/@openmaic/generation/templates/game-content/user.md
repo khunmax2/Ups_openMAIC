@@ -59,7 +59,7 @@ Generate a FUN, INTERACTIVE HTML game with these MANDATORY features:
 4. Responsive layout (mobile + desktop)
 
 ### Technical (MANDATORY)
-1. **Inline onclick for start button**: `<button onclick="startGame()">开始</button>` - NOT addEventListener
+1. **Inline onclick for start button**: `<button onclick="startGame()">Start</button>` - NOT addEventListener
 2. **Custom CSS preferred**: Avoid Tailwind `@layer utilities` blocks; use plain CSS
 3. **DOMContentLoaded wrapper**: Wrap game code in `document.addEventListener('DOMContentLoaded', ...)`
 4. **Global start function**: `function startGame()` must be callable from onclick

@@ -228,6 +228,63 @@ DeepWitya's `learner` preset outright; that is DeepWitya's decision and lives
 in its repository, but it is why an `anon:` owner never appears here in the
 deployment.
 
+### The prompt templates show the model no Chinese output
+
+A Thai course came out with a start button reading 启动 and a fullwidth colon
+in a status label, body text otherwise correct Thai. Swapping the model did
+not help, because the model was not the cause: the templates showed it Chinese
+output — two complete worked outlines with Chinese titles and keyPoints, a
+Chinese few-shot challenge, a course-title style list in Chinese, and a
+task-engine prompt announcing the learner-facing product name as 任务引擎. A
+model told to teach in Thai copies the shape it is shown.
+
+Eleven lines across four files, and a guard:
+`tests/prompts/no-cjk-in-worked-examples.test.ts` bans CJK inside fenced
+blocks in every template while allowing it in prose. That line is deliberate.
+Chinese in prose is an example of what a learner might **say** — the
+language-inference rules, the director's frustration signals, the "用中文讲"
+requests — and those are inputs, paired with English; removing them would make
+the product worse for Chinese users. Fenced blocks are what the model reads as
+a template for its own answer. 271 CJK characters became 143, none fenced.
+
+That fixed the outlines and left the buttons. The next Thai course had Thai
+outlines and a simulation whose controls still read 暂停 and 继续, in the same
+place in two different courses, because there is a second template root.
+`lib/prompts` decides what a course *is*; `packages/@openmaic/generation/
+templates` decides what the learner *sees* — the HTML of a simulation, a game,
+a 3D view, a diagram. `simulation-content/system.md` told the model, in a
+bullet list rather than a fence, that the control button reads "启动" /
+"暂停" / "继续" / "重新开始", and the model did as it was told. A guard that
+only looked at fences and only at `lib/prompts` passed while that shipped.
+
+So the guard now scans both roots, and for the templates whose output is
+learner-facing markup (`simulation-`, `game-`, `visualization3d-`, `diagram-`,
+`code-`, `procedural-skill-content`) it bans CJK anywhere, prose included —
+nothing in those files is an example of what a learner might say, so a label
+named in a bullet is copied as faithfully as one named in a fence. The
+button names became "Start" / "Pause" / "Resume" / "Restart" with the note that
+they are written in the teaching language; the worked simulation's
+`updateButton('启动')` became `updateButton(START_LABEL)` with the constant
+declared beside the state, so the example no longer carries a literal in any
+language. 217 CJK characters in that root became 139, all of them inputs.
+
+Two things this deliberately does not do:
+
+- **It does not touch fonts.** The first attempt at this, before the fork
+  existed, swapped Microsoft YaHei for Tahoma in 19 places and broke slide
+  layout everywhere at once: every element is an absolutely positioned box on
+  a fixed 1000×562 canvas, and the model sizes those boxes for the font the
+  slide renders with. Change the font and the text changes size inside boxes
+  that stay where they were. That, not the prompt edit, was the breakage.
+- **It does not claim to finish the job.** Chinese remains in the TS-side
+  prompts (`lib/chat/pi/prompts.ts` has one fenced example, the PBL instructor
+  and planner carry more, and `packages/@openmaic/generation/prompts-pbl` is
+  a third root the guard does not scan) and in `agent-system` / `director`
+  prose. Each is a separate, measured change.
+
+Reverting needs no rebuild of anything else: the templates are read with
+`fs.readFileSync` per call and ship into the image as files.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,
