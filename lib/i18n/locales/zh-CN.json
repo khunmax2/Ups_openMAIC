@@ -1705,6 +1705,7 @@
     "imageModel": "图像生成模型",
     "providerSeedream": "Seedream（字节豆包）",
     "providerOpenAIImage": "OpenAI 图像",
+    "providerOpenAICompatibleImage": "OpenAI Compatible",
     "providerQwenImage": "Qwen Image（阿里通义）",
     "providerNanoBanana": "Nano Banana（Gemini）",
     "providerMiniMaxImage": "MiniMax 图像",

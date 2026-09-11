@@ -14,6 +14,10 @@ import {
   generateWithOpenAIImage,
   testOpenAIImageConnectivity,
 } from './adapters/openai-image-adapter';
+import {
+  generateWithOpenAICompatibleImage,
+  testOpenAICompatibleImageConnectivity,
+} from './adapters/openai-compatible-image-adapter';
 import { generateWithQwenImage, testQwenImageConnectivity } from './adapters/qwen-image-adapter';
 import { generateWithNanoBanana, testNanoBananaConnectivity } from './adapters/nano-banana-adapter';
 import {
@@ -58,6 +62,19 @@ export const IMAGE_PROVIDERS: Record<ImageProviderId, ImageProviderConfig> = {
       { id: 'gpt-image-1-mini', name: 'GPT Image 1 Mini' },
       { id: 'chatgpt-image-latest', name: 'ChatGPT Image Latest' },
     ],
+    supportedAspectRatios: ['16:9', '4:3', '1:1', '9:16'],
+  },
+  // Fork addition. The same wire protocol as OpenAI Image, without OpenAI's
+  // catalogue or endpoint: a self-hosted server (vLLM, LiteLLM, a diffusion
+  // server behind an OpenAI-shaped API) has its own model names and often no
+  // key. Base URL is the whole configuration; the model list is what the
+  // operator adds.
+  'custom-image': {
+    id: 'custom-image',
+    name: 'OpenAI Compatible',
+    requiresApiKey: false,
+    defaultBaseUrl: '',
+    models: [],
     supportedAspectRatios: ['16:9', '4:3', '1:1', '9:16'],
   },
   'qwen-image': {
@@ -168,6 +185,8 @@ export async function testImageConnectivity(
       return testSeedreamConnectivity(config);
     case 'openai-image':
       return testOpenAIImageConnectivity(config);
+    case 'custom-image':
+      return testOpenAICompatibleImageConnectivity(config);
     case 'qwen-image':
       return testQwenImageConnectivity(config);
     case 'nano-banana':
@@ -197,6 +216,8 @@ export async function generateImage(
       return generateWithSeedream(config, options);
     case 'openai-image':
       return generateWithOpenAIImage(config, options);
+    case 'custom-image':
+      return generateWithOpenAICompatibleImage(config, options);
     case 'qwen-image':
       return generateWithQwenImage(config, options);
     case 'nano-banana':

@@ -1705,6 +1705,7 @@
     "imageModel": "Modelo de generación de imágenes",
     "providerSeedream": "Seedream (ByteDance)",
     "providerOpenAIImage": "OpenAI Image",
+    "providerOpenAICompatibleImage": "OpenAI Compatible",
     "providerQwenImage": "Qwen Image (Alibaba)",
     "providerNanoBanana": "Nano Banana (Gemini)",
     "providerMiniMaxImage": "MiniMax Image",
