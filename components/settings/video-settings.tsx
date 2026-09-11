@@ -98,7 +98,7 @@ export function VideoSettings({ selectedProviderId }: VideoSettingsProps) {
         setTestMessage(t('settings.videoConnectivitySuccess'));
       } else {
         setTestStatus('error');
-        setTestMessage(`${t('settings.videoConnectivityFailed')}: ${data.message}`);
+        setTestMessage(`${t('settings.videoConnectivityFailed')}: ${data.error ?? data.message}`);
       }
     } catch (err) {
       setTestStatus('error');

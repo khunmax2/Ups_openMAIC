@@ -22,6 +22,16 @@ const nextConfig: NextConfig = {
       'lib/server/agent-runtime/import-pptx-worker.mjs',
       'skills/openmaic/**',
       'skills/agent-runtime/**',
+      // Fork addition. The app's sharp (0.35.x) links libvips at load time
+      // through the dynamic linker, not through require(), so the tracer
+      // copies @img/sharp-libvips-*/lib/index.js and leaves the .so behind.
+      // Next's own older sharp is special-cased and arrives whole, which is
+      // why the image carried libvips 8.17 and the app asked for 8.18. In the
+      // container the failure is one line at boot -- "Agent runtime startup
+      // failed ... Could not load the sharp module" -- and after it the job
+      // runner and material extraction never start, while every page serves.
+      // The Dockerfile asserts the module loads before the image is finished.
+      'node_modules/.pnpm/@img+sharp-libvips-*/node_modules/@img/sharp-libvips-*/lib/**',
     ],
   },
   typescript: {
