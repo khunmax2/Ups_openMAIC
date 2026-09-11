@@ -293,6 +293,47 @@ describe('credential context and the resolver funnel', () => {
     });
   });
 
+  it('reads an owner once per TTL, and again after that owner writes', async () => {
+    const q = await arm([
+      {
+        scope: 'owner',
+        owner_id: 'user:a',
+        section: 'image',
+        provider_id: 'custom-image',
+        api_key: 'k1',
+        base_url: '',
+      },
+    ]);
+    const spy = vi.spyOn(q, 'query');
+    const { runWithCredentials, invalidateCredentialCache } =
+      await import('@/lib/server/credentials/context');
+    const { resolveImageApiKey } = await import('@/lib/server/provider-config');
+    const listCalls = () =>
+      spy.mock.calls.filter(([sql]) => String(sql).includes("scope = 'default'")).length;
+
+    await runWithCredentials('user:a', 'user', async () => {
+      expect(resolveImageApiKey('custom-image')).toBe('k1');
+    });
+    await runWithCredentials('user:a', 'user', async () => {
+      expect(resolveImageApiKey('custom-image')).toBe('k1');
+    });
+    expect(listCalls()).toBe(1);
+
+    // A write through the store must be visible on the next request.
+    q.rows[0]!.api_key = 'k2';
+    invalidateCredentialCache('user:a');
+    await runWithCredentials('user:a', 'user', async () => {
+      expect(resolveImageApiKey('custom-image')).toBe('k2');
+    });
+    expect(listCalls()).toBe(2);
+
+    // Another owner is another cache entry.
+    await runWithCredentials('user:b', 'user', async () => {
+      expect(resolveImageApiKey('custom-image')).toBe('');
+    });
+    expect(listCalls()).toBe(3);
+  });
+
   it('runs the handler as upstream would when there is no database', async () => {
     vi.doMock('@/lib/persistence/server-provider', () => ({
       getServerPersistenceProvider: async () => {

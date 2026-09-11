@@ -24,6 +24,13 @@ vi.mock('@/lib/ai/providers', async (importOriginal) => {
   return { ...actual, isProviderKeyRequired: vi.fn(() => false) };
 });
 vi.mock('@/lib/live-mode', () => ({ isLiveMode: false }));
+// Fork: the route runs inside the owner's credential context, which reads the
+// same persistence provider this test counts calls on. What is under test here
+// is the WB inventory wiring; the credential edge has its own tests.
+vi.mock('@/lib/server/credentials/context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/server/credentials/context')>()),
+  withOwnerCredentials: <T>(handler: T) => handler,
+}));
 vi.mock('@/lib/persistence/server-provider', () => ({
   getServerPersistenceProvider: mocks.getServerPersistenceProvider,
 }));

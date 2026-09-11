@@ -21,7 +21,7 @@ import {
   studioGatewayRequired,
 } from '@/lib/server/studio-identity';
 
-import { credentialStore } from './context';
+import { credentialStore, invalidateCredentialCache } from './context';
 import {
   deleteCredential,
   isCredentialSection,
@@ -168,6 +168,7 @@ export async function handleWrite(request: Request, segments: string[]): Promise
 
   if (request.method === 'DELETE') {
     const removed = await deleteCredential(store, full);
+    invalidateCredentialCache(address.scope === 'default' ? undefined : owner);
     return json(200, { removed });
   }
   if (request.method !== 'PUT') {
@@ -192,6 +193,7 @@ export async function handleWrite(request: Request, segments: string[]): Promise
   }
   const { copyFromOwner: _copy, ...fields } = patch;
   const stored = await upsertCredential(store, full, fields);
+  invalidateCredentialCache(address.scope === 'default' ? undefined : owner);
   return json(200, {
     stored: stored ? { masked: maskCredential(stored.apiKey), baseUrl: stored.baseUrl } : null,
   });

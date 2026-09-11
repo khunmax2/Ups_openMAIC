@@ -101,21 +101,45 @@ export async function credentialStore() {
  * database there is nothing to load and `fn` runs as before -- upstream's
  * shape, where the client's key is the only key.
  */
+const EMPTY: CredentialSet = { own: {}, defaults: {} };
+
+/**
+ * One read per owner per minute, not per request. Every route that resolves
+ * a key runs through here, and most of them are called many times per course
+ * generation; the rows change only when someone edits Settings, and that
+ * edit invalidates. A default-scope edit touches every owner, so it drops
+ * the whole cache.
+ */
+const CACHE_TTL_MS = Number(process.env.STUDIO_CREDENTIAL_CACHE_MS || 60_000);
+const cache = new Map<string, { credentials: CredentialSet; expires: number }>();
+
+export function invalidateCredentialCache(ownerId?: string): void {
+  if (ownerId === undefined) cache.clear();
+  else cache.delete(ownerId);
+}
+
+async function loadCredentials(ownerId: string): Promise<CredentialSet> {
+  const hit = cache.get(ownerId);
+  if (hit && hit.expires > Date.now()) return hit.credentials;
+  const queryable = await credentialQueryable().catch((error) => {
+    console.error('[credentials] store unavailable; running without stored credentials', error);
+    return undefined;
+  });
+  if (!queryable) return EMPTY;
+  const credentials = await listCredentials(queryable, ownerId).catch((error) => {
+    console.error('[credentials] load failed; running without stored credentials', error);
+    return EMPTY;
+  });
+  cache.set(ownerId, { credentials, expires: Date.now() + CACHE_TTL_MS });
+  return credentials;
+}
+
 export async function runWithCredentials<T>(
   ownerId: string,
   role: StudioRole,
   fn: () => Promise<T>,
 ): Promise<T> {
-  const queryable = await credentialQueryable().catch((error) => {
-    console.error('[credentials] store unavailable; running without stored credentials', error);
-    return undefined;
-  });
-  const credentials: CredentialSet = queryable
-    ? await listCredentials(queryable, ownerId).catch((error) => {
-        console.error('[credentials] load failed; running without stored credentials', error);
-        return { own: {}, defaults: {} };
-      })
-    : { own: {}, defaults: {} };
+  const credentials = await loadCredentials(ownerId);
   return storage.run({ ownerId, role, credentials }, fn);
 }
 
@@ -133,7 +157,11 @@ export function withOwnerCredentials<
   handler: (request: Req, ...rest: Args) => Promise<Res>,
 ): (request: Req, ...rest: Args) => Promise<Res> {
   return async (request, ...rest) => {
-    const ownerId = readStudioOwnerId(request.headers) ?? readAnonymousOwnerId(request.headers);
+    // A caller that hands the handler a bare object (unit tests do) has no
+    // headers to read; run it as upstream would rather than throw.
+    const headers = request?.headers;
+    if (!headers || typeof headers.get !== 'function') return handler(request, ...rest);
+    const ownerId = readStudioOwnerId(headers) ?? readAnonymousOwnerId(headers);
     if (!ownerId) return handler(request, ...rest);
     return runWithCredentials(ownerId, readStudioRole(request.headers), () =>
       handler(request, ...rest),
