@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/hooks/use-i18n';
@@ -10,7 +11,7 @@ import { useSettingsStore } from '@/lib/store/settings';
 import { PDF_PROVIDERS } from '@/lib/pdf/constants';
 import type { PDFProviderId } from '@/lib/pdf/types';
 import { getFormatLabelsForProviders } from '@/lib/document/mime';
-import { CheckCircle2, Eye, EyeOff, Loader2, Zap, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, Zap, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiPath } from '@/lib/base-path';
 
@@ -35,7 +36,6 @@ interface PDFSettingsProps {
 
 export function PDFSettings({ selectedProviderId }: PDFSettingsProps) {
   const { t } = useI18n();
-  const [showApiKey, setShowApiKey] = useState(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
 
@@ -66,7 +66,6 @@ export function PDFSettings({ selectedProviderId }: PDFSettingsProps) {
   const [prevSelectedProviderId, setPrevSelectedProviderId] = useState(selectedProviderId);
   if (selectedProviderId !== prevSelectedProviderId) {
     setPrevSelectedProviderId(selectedProviderId);
-    setShowApiKey(false);
     setTestStatus('idle');
     setTestMessage('');
   }
@@ -123,29 +122,13 @@ export function PDFSettings({ selectedProviderId }: PDFSettingsProps) {
               <div className="space-y-2">
                 <Label className="text-sm">{t('settings.pdfApiKey')}</Label>
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      name={`pdf-api-key-${selectedProviderId}`}
-                      type={showApiKey ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      placeholder={t('settings.mineruCloudApiKeyPlaceholder')}
-                      value={providerConfig?.apiKey || ''}
-                      onChange={(e) =>
-                        setPDFProviderConfig(selectedProviderId, { apiKey: e.target.value })
-                      }
-                      className="font-mono text-sm pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+                  <ApiKeyField
+                    name={`pdf-api-key-${selectedProviderId}`}
+                    placeholder={t('settings.mineruCloudApiKeyPlaceholder')}
+                    value={providerConfig?.apiKey || ''}
+                    onChange={(v) => setPDFProviderConfig(selectedProviderId, { apiKey: v })}
+                    className="flex-1"
+                  />
                   <Button
                     variant="outline"
                     size="sm"
@@ -188,31 +171,17 @@ export function PDFSettings({ selectedProviderId }: PDFSettingsProps) {
                 <div className="space-y-2">
                   <Label className="text-sm">{t('settings.alidocmindAccessKeySecret')}</Label>
                   <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        name={`pdf-ak-secret-${selectedProviderId}`}
-                        type={showApiKey ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        placeholder={t('settings.enterApiKey')}
-                        value={providerConfig?.accessKeySecret || ''}
-                        onChange={(e) =>
-                          setPDFProviderConfig(selectedProviderId, {
-                            accessKeySecret: e.target.value,
-                          })
-                        }
-                        className="font-mono text-sm pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
+                    <ApiKeyField
+                      name={`pdf-ak-secret-${selectedProviderId}`}
+                      placeholder={t('settings.enterApiKey')}
+                      value={providerConfig?.accessKeySecret || ''}
+                      onChange={(v) =>
+                        setPDFProviderConfig(selectedProviderId, {
+                          accessKeySecret: v,
+                        })
+                      }
+                      className="flex-1"
+                    />
                     <Button
                       variant="outline"
                       size="sm"
@@ -291,29 +260,13 @@ export function PDFSettings({ selectedProviderId }: PDFSettingsProps) {
                     ({t('settings.optional')})
                   </span>
                 </Label>
-                <div className="relative">
-                  <Input
-                    name={`pdf-api-key-${selectedProviderId}`}
-                    type={showApiKey ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    placeholder={t('settings.enterApiKey')}
-                    value={providerConfig?.apiKey || ''}
-                    onChange={(e) =>
-                      setPDFProviderConfig(selectedProviderId, { apiKey: e.target.value })
-                    }
-                    className="font-mono text-sm pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+                <ApiKeyField
+                  name={`pdf-api-key-${selectedProviderId}`}
+                  placeholder={t('settings.enterApiKey')}
+                  value={providerConfig?.apiKey || ''}
+                  onChange={(v) => setPDFProviderConfig(selectedProviderId, { apiKey: v })}
+                  className="flex-1"
+                />
               </div>
             )}
           </div>

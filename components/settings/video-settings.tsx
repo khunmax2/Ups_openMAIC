@@ -3,23 +3,14 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useSettingsStore } from '@/lib/store/settings';
 import { VIDEO_PROVIDERS } from '@/lib/media/video-providers';
-import {
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Eye,
-  EyeOff,
-  Zap,
-  Plus,
-  Settings2,
-  Trash2,
-} from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Zap, Plus, Settings2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VideoProviderId } from '@/lib/media/types';
 import { apiPath } from '@/lib/base-path';
@@ -37,8 +28,6 @@ export function VideoSettings({ selectedProviderId }: VideoSettingsProps) {
   const videoGenerationEnabled = useSettingsStore((state) => state.videoGenerationEnabled);
   const setVideoGenerationEnabled = useSettingsStore((state) => state.setVideoGenerationEnabled);
   const setVideoProviderConfig = useSettingsStore((state) => state.setVideoProviderConfig);
-
-  const [showApiKey, setShowApiKey] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
@@ -186,31 +175,15 @@ export function VideoSettings({ selectedProviderId }: VideoSettingsProps) {
           <div className="space-y-2">
             <Label>API Key</Label>
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  name={`video-api-key-${selectedProviderId}`}
-                  type={showApiKey ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={
-                    selectedProviderId === 'kling'
-                      ? 'accessKey:secretKey'
-                      : t('settings.enterApiKey')
-                  }
-                  value={currentConfig?.apiKey || ''}
-                  onChange={(e) => handleApiKeyChange(e.target.value)}
-                  className="h-8 pr-8"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <ApiKeyField
+                name={`video-api-key-${selectedProviderId}`}
+                placeholder={
+                  selectedProviderId === 'kling' ? 'accessKey:secretKey' : t('settings.enterApiKey')
+                }
+                value={currentConfig?.apiKey || ''}
+                onChange={handleApiKeyChange}
+                className="flex-1"
+              />
               <Button
                 variant="outline"
                 size="sm"

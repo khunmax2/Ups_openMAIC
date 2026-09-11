@@ -2,12 +2,10 @@
 
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
-  Eye,
-  EyeOff,
   CheckCircle2,
   Zap,
   MessageSquare,
@@ -80,7 +78,6 @@ export function TokenPlanSettings() {
 
   const [selected, setSelected] = useState<TokenPlanPreset | null>(null);
   const [apiKey, setApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
   const [activeTab, setActiveTab] = useState<TokenPlanModality>('llm');
 
   const grouped = PRESET_CATEGORY_ORDER.map((cat) => ({
@@ -214,23 +211,13 @@ export function TokenPlanSettings() {
               <div className="space-y-2">
                 <Label className="text-sm">{t('settings.tokenPlan.apiKey')}</Label>
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      type={showKey ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      placeholder={selected.apiKeyPlaceholder ?? 'sk-...'}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      className="h-8 pr-8"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKey(!showKey)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+                  <ApiKeyField
+                    name={`token-plan-api-key-${selected.id}`}
+                    placeholder={selected.apiKeyPlaceholder ?? 'sk-...'}
+                    value={apiKey}
+                    onChange={setApiKey}
+                    className="flex-1"
+                  />
                   {(() => {
                     const enabled = isPresetEnabled(selected);
                     const savedKey = presetSavedKey(selected);

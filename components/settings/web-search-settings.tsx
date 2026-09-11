@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Switch } from '@/components/ui/switch';
 import {
   Select,
@@ -20,7 +21,7 @@ import {
   WEB_SEARCH_PROVIDERS,
 } from '@/lib/web-search/constants';
 import type { BaiduSubSources, WebSearchProviderId } from '@/lib/web-search/types';
-import { ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 
 interface WebSearchSettingsProps {
   selectedProviderId: WebSearchProviderId;
@@ -28,7 +29,6 @@ interface WebSearchSettingsProps {
 
 export function WebSearchSettings({ selectedProviderId }: WebSearchSettingsProps) {
   const { t } = useI18n();
-  const [showApiKey, setShowApiKey] = useState(false);
 
   const webSearchProvidersConfig = useSettingsStore((state) => state.webSearchProvidersConfig);
   const setWebSearchProviderConfig = useSettingsStore((state) => state.setWebSearchProviderConfig);
@@ -48,11 +48,10 @@ export function WebSearchSettings({ selectedProviderId }: WebSearchSettingsProps
     return `${trimmed}${provider.endpointPath}`;
   };
 
-  // Reset showApiKey when provider changes (derived state pattern)
+  // Reset per-provider view state when provider changes (derived state pattern)
   const [prevSelectedProviderId, setPrevSelectedProviderId] = useState(selectedProviderId);
   if (selectedProviderId !== prevSelectedProviderId) {
     setPrevSelectedProviderId(selectedProviderId);
-    setShowApiKey(false);
   }
 
   return (
@@ -82,35 +81,21 @@ export function WebSearchSettings({ selectedProviderId }: WebSearchSettingsProps
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm">{t('settings.webSearchApiKey')}</Label>
-              <div className="relative">
-                <Input
-                  name={`web-search-api-key-${selectedProviderId}`}
-                  type={showApiKey ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={
-                    !provider.requiresApiKey
-                      ? t('settings.optionalOverride')
-                      : t('settings.enterApiKey')
-                  }
-                  value={webSearchProvidersConfig[selectedProviderId]?.apiKey || ''}
-                  onChange={(e) =>
-                    setWebSearchProviderConfig(selectedProviderId, {
-                      apiKey: e.target.value,
-                    })
-                  }
-                  className="font-mono text-sm pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <ApiKeyField
+                name={`web-search-api-key-${selectedProviderId}`}
+                placeholder={
+                  !provider.requiresApiKey
+                    ? t('settings.optionalOverride')
+                    : t('settings.enterApiKey')
+                }
+                value={webSearchProvidersConfig[selectedProviderId]?.apiKey || ''}
+                onChange={(v) =>
+                  setWebSearchProviderConfig(selectedProviderId, {
+                    apiKey: v,
+                  })
+                }
+                className="flex-1"
+              />
               <p className="text-xs text-muted-foreground">{t('settings.webSearchApiKeyHint')}</p>
             </div>
 

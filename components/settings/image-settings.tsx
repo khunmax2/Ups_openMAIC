@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ApiKeyField } from '@/components/settings/api-key-field';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -13,8 +14,6 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Eye,
-  EyeOff,
   Zap,
   Plus,
   Settings2,
@@ -45,8 +44,6 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
   const _setImageModelId = useSettingsStore((state) => state.setImageModelId);
   const setImageProvider = useSettingsStore((state) => state.setImageProvider);
   const setImageProviderConfig = useSettingsStore((state) => state.setImageProviderConfig);
-
-  const [showApiKey, setShowApiKey] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
@@ -226,27 +223,13 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
           <div className="space-y-2">
             <Label>API Key</Label>
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  name={`image-api-key-${selectedProviderId}`}
-                  type={showApiKey ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={t('settings.enterApiKey')}
-                  value={currentConfig?.apiKey || ''}
-                  onChange={(e) => handleApiKeyChange(e.target.value)}
-                  className="h-8 pr-8"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <ApiKeyField
+                name={`image-api-key-${selectedProviderId}`}
+                placeholder={t('settings.enterApiKey')}
+                value={currentConfig?.apiKey || ''}
+                onChange={handleApiKeyChange}
+                className="flex-1"
+              />
               <Button
                 variant="outline"
                 size="sm"
