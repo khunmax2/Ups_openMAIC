@@ -642,6 +642,16 @@ function resolveSectionApiKey(
   return clientKey || ''; // unmanaged: client-supplied key only
 }
 
+// The base URL follows the key's precedence, not its own. A key and the
+// endpoint it is sent to are one credential: when the key comes from a
+// stored row (the owner's, or the admin's shared default) the endpoint comes
+// from that same row -- and an empty one means the provider's built-in
+// default, never the caller's value. Resolving the two separately let a
+// caller pair the admin's shared key with a base URL of their choosing
+// whenever the stored row had no URL (found by the 2026-09-11 audit, F2):
+// the request would then carry `Authorization: Bearer <shared key>` to an
+// endpoint the caller controls. The caller's URL is honoured only where the
+// caller's key is -- an unmanaged provider with no stored key.
 function resolveSectionBaseUrl(
   section: ProviderSection,
   providerId: string,
@@ -650,8 +660,9 @@ function resolveSectionBaseUrl(
   const entry = getConfig()[section][providerId];
   if (entry) return entry.baseUrl; // managed: server base URL is authoritative
   const stored = currentCredential(section, providerId);
-  if (stored?.baseUrl) return stored.baseUrl;
-  return clientBaseUrl; // unmanaged: client-supplied base URL only
+  if (stored?.apiKey) return stored.baseUrl || undefined; // stored key ⇒ stored URL, or the provider default
+  if (stored?.baseUrl) return stored.baseUrl; // URL-only row (keyless provider): still the stored one
+  return clientBaseUrl; // unmanaged, nothing stored: client-supplied base URL only
 }
 
 /**
