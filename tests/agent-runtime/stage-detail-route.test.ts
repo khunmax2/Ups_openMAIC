@@ -240,4 +240,22 @@ describe('DELETE /api/stages/[id]', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
   });
+
+  it('answers 404, not 500, when the owner scope refuses a foreign stage', async () => {
+    // The store throws StageAccessError (a DocumentNotFoundError) for a
+    // foreign, tombstoned or unclaimed id; the route used to let it surface
+    // as a 500 (2026-09-11 audit, F5). Same 404 as the read, no oracle.
+    mocks.fakeStore!.failNextDeleteWith(
+      new DocumentNotFoundError(STAGE_ID, 'stage access refused (foreign)'),
+    );
+    const response = await call(DELETE);
+    expect(response.status).toBe(404);
+    expect(mocks.fakeStore!.docs.has(STAGE_ID)).toBe(true);
+  });
+
+  it('still answers 500 when the store throws unexpectedly', async () => {
+    mocks.fakeStore!.failNextDeleteWith(new Error('connection reset'));
+    const response = await call(DELETE);
+    expect(response.status).toBe(500);
+  });
 });
