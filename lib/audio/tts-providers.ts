@@ -250,6 +250,16 @@ export async function generateTTS(
 
       default:
         if (isCustomTTSProvider(config.providerId)) {
+          // Fork. A custom provider has no built-in endpoint: the default
+          // generateOpenAITTS falls back to is OpenAI's, and a custom
+          // provider's key is not OpenAI's to receive. Without a base URL,
+          // refuse before any request leaves -- the rule custom ASR already
+          // follows (transcribeCustomOpenAICompatibleASR).
+          if (!config.baseUrl?.trim()) {
+            throw new Error(
+              "Custom TTS provider requires a base URL -- set it in the provider's Base URL field",
+            );
+          }
           return await generateOpenAITTS(config, text, signal);
         }
         throw new Error(`Unsupported TTS provider: ${config.providerId}`);

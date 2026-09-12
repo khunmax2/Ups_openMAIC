@@ -228,4 +228,79 @@ describe('server-side credentials, browser half', () => {
     expect(persisted?.imageProvidersConfig?.['custom-image']?.apiKey).toBe('***');
     expect(JSON.stringify(persisted)).not.toContain('in-flight-key');
   });
+
+  // Fork. A custom provider's endpoint is the URL it was added with, held in
+  // customDefaultBaseUrl while its Base URL field stays empty. The server
+  // pairs a stored key only with the stored URL (audit F2), so that URL has to
+  // travel with the key -- found 2026-09-12 when a custom TTS key stored alone
+  // was sent to OpenAI's default endpoint instead of the provider's own.
+  it("sends a custom provider's own endpoint with its key when the Base URL field is empty", async () => {
+    vi.useFakeTimers();
+    const { calls } = fakeServer({});
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    useSettingsStore
+      .getState()
+      .addCustomTTSProvider('custom-tts-mine', 'MyTTS', 'http://tts.internal/v1', true, 'tts-1');
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
+    resetCredentialSyncForTests();
+    await startCredentialSync();
+
+    useSettingsStore.getState().setTTSProviderConfig('custom-tts-mine', { apiKey: 'theia-key-1' });
+    await vi.advanceTimersByTimeAsync(900);
+
+    const puts = calls.filter((c) => c.method === 'PUT');
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.url).toContain('/api/studio/credentials/tts/custom-tts-mine');
+    expect(puts[0]?.body).toEqual({ apiKey: 'theia-key-1', baseUrl: 'http://tts.internal/v1' });
+  });
+
+  it("migrates a custom provider's key together with its endpoint", async () => {
+    const { calls } = fakeServer({});
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    useSettingsStore
+      .getState()
+      .addCustomASRProvider('custom-asr-mine', 'MyASR', 'http://asr.internal/v1', true);
+    useSettingsStore
+      .getState()
+      .setASRProviderConfig('custom-asr-mine', { apiKey: 'old-asr-key-0000' });
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
+    resetCredentialSyncForTests();
+    await startCredentialSync();
+
+    const puts = calls.filter((c) => c.method === 'PUT');
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.body).toEqual({
+      apiKey: 'old-asr-key-0000',
+      baseUrl: 'http://asr.internal/v1',
+    });
+  });
+
+  it('fills in the endpoint, once, for a custom provider stored with its key alone', async () => {
+    const { calls } = fakeServer({
+      own: { tts: { 'custom-tts-mine': { masked: 'th••••', baseUrl: '' } } },
+      // An admin's shared row is theirs to edit, never filled in from here.
+      defaults: { tts: { 'custom-tts-shared': { masked: 'sk••••', baseUrl: '' } } },
+    });
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    const store = useSettingsStore.getState();
+    store.addCustomTTSProvider('custom-tts-mine', 'MyTTS', 'http://tts.internal/v1', true, 'tts-1');
+    store.addCustomTTSProvider('custom-tts-shared', 'Shared', 'http://shared/v1', true, 'tts-1');
+    const { startCredentialSync, resetCredentialSyncForTests } =
+      await import('@/lib/credentials/client');
+    resetCredentialSyncForTests();
+    await startCredentialSync();
+
+    const puts = calls.filter((c) => c.method === 'PUT');
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.url).toContain('/api/studio/credentials/tts/custom-tts-mine');
+    expect(puts[0]?.body).toEqual({ baseUrl: 'http://tts.internal/v1' });
+    const s = useSettingsStore.getState();
+    expect(s.ttsProvidersConfig['custom-tts-mine']).toMatchObject({
+      apiKey: '***',
+      baseUrl: 'http://tts.internal/v1',
+    });
+    expect(s.credentialMeta['tts:custom-tts-mine']?.baseUrl).toBe('http://tts.internal/v1');
+  });
 });

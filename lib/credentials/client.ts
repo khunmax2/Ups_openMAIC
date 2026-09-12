@@ -13,7 +13,13 @@
  * - afterwards, a real key typed into the store is sent (debounced) and
  *   replaced with the sentinel as soon as the server confirms it;
  * - a base URL edit is sent the same way, since a self-hosted endpoint's key
- *   is not usable without it.
+ *   is not usable without it;
+ * - a custom TTS/ASR provider's endpoint is the URL entered when it was added
+ *   (`customDefaultBaseUrl`) until someone types into its Base URL field, and
+ *   it travels with the key all the same: the server pairs a stored key only
+ *   with the stored URL (audit F2), so a row without one is a key with
+ *   nowhere to go. Rows stored before this carried no URL; boot fills them
+ *   in, once.
  *
  * With no database behind the studio (`storage: 'none'`) none of this runs
  * and the browser keeps its keys, which is upstream's shape.
@@ -65,10 +71,19 @@ export function metaKey(section: CredentialSection, providerId: string): string 
   return `${section}:${providerId}`;
 }
 
-type Entry = { apiKey?: string; baseUrl?: string; enabled?: boolean };
+type Fields = { apiKey?: string; baseUrl?: string; enabled?: boolean };
+type Entry = Fields & { customDefaultBaseUrl?: string };
 
 /** What PUT accepts: the fields, or an admin's request to copy their own row. */
-export type CredentialPatch = Entry & { copyFromOwner?: boolean };
+export type CredentialPatch = Fields & { copyFromOwner?: boolean };
+
+/**
+ * The endpoint this entry's key is used with -- the same URL the page sends
+ * with a request: the Base URL field, else a custom provider's own URL.
+ */
+function endpointOf(entry: Entry): string {
+  return entry.baseUrl?.trim() || entry.customDefaultBaseUrl?.trim() || '';
+}
 
 function isRealKey(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '' && value.trim() !== CREDENTIAL_SENTINEL;
@@ -234,11 +249,36 @@ async function migrateStoredKeys(meta: CredentialMeta): Promise<CredentialMeta> 
     for (const [id, entry] of Object.entries(sectionEntries(state, section))) {
       if (!isRealKey(entry.apiKey)) continue;
       if (next[metaKey(section, id)]?.source === 'own') continue;
+      const url = endpointOf(entry);
       const stored = await putCredential(section, id, {
         apiKey: entry.apiKey.trim(),
-        ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
+        ...(url ? { baseUrl: url } : {}),
       });
       if (stored) next[metaKey(section, id)] = { ...stored, source: 'own' };
+    }
+  }
+  return next;
+}
+
+/**
+ * A custom provider's own row stored before its URL travelled with the key
+ * holds the key alone, and the server will not pair it with the URL a request
+ * sends. Fill the URL in from the one the provider was added with -- own rows
+ * only (an admin's shared row is theirs to edit), once, because the filled row
+ * no longer has an empty URL.
+ */
+async function backfillEndpoints(meta: CredentialMeta): Promise<CredentialMeta> {
+  const state = useSettingsStore.getState();
+  const next = { ...meta };
+  for (const section of CREDENTIAL_SECTIONS) {
+    for (const [id, entry] of Object.entries(sectionEntries(state, section))) {
+      const key = metaKey(section, id);
+      const row = next[key];
+      if (row?.source !== 'own' || row.baseUrl) continue;
+      const url = entry.customDefaultBaseUrl?.trim();
+      if (!url) continue;
+      const stored = await putCredential(section, id, { baseUrl: url });
+      if (stored) next[key] = { ...stored, source: 'own' };
     }
   }
   return next;
@@ -278,9 +318,12 @@ function watchStore() {
             pending.delete(key);
             const latest = sectionEntries(useSettingsStore.getState(), section)[id];
             if (!latest) return;
-            const patch: Entry = {};
+            const patch: Fields = {};
             if (isRealKey(latest.apiKey)) patch.apiKey = latest.apiKey.trim();
-            if (typeof latest.baseUrl === 'string') patch.baseUrl = latest.baseUrl;
+            // The URL goes with the key even when the field is empty and the
+            // endpoint is a custom provider's own.
+            const url = endpointOf(latest);
+            if (typeof latest.baseUrl === 'string' || url) patch.baseUrl = url;
             if (patch.apiKey === undefined && patch.baseUrl === undefined) return;
             const stored = await putCredential(section, id, patch);
             if (stored === undefined) return; // network/server error: keep what we have
@@ -321,7 +364,7 @@ export async function startCredentialSync(): Promise<void> {
     useSettingsStore.setState({ credentialStorage: 'none' });
     return;
   }
-  const meta = await migrateStoredKeys(metaFrom(list));
+  const meta = await backfillEndpoints(await migrateStoredKeys(metaFrom(list)));
   applyMeta(meta, list.role, defaultsFrom(list));
   watchStore();
 }

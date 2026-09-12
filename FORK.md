@@ -219,6 +219,14 @@ server and hands the browser `***`; this is that shape.
   once and replaced (the migration for existing users); afterwards a typed
   key is sent debounced and swapped for the sentinel on confirmation; the
   persist layer never writes a real key once the server holds them.
+  A key and its endpoint are one credential (audit F2, 2026-09-11): a stored
+  key is used only with the URL stored beside it, never one a request sends.
+  So the URL travels with the key -- the Base URL field, or for a custom
+  TTS/ASR provider the URL it was added with (`customDefaultBaseUrl`) -- and
+  boot fills in the URL of an own custom-provider row stored before that. A
+  custom TTS provider left without a URL refuses before any request leaves
+  instead of falling back to OpenAI's endpoint (`lib/audio/tts-providers.ts`;
+  2026-09-12, a custom provider's key had reached api.openai.com that way).
 - `components/settings/api-key-field.tsx` — shows the server's mask, offers
   remove, and for an admin "set as the system default".
 
