@@ -76,13 +76,29 @@ describe('GET /api/stage-meta/[stageId]', () => {
     });
   });
 
-  it('reports a visitor as non-owner', async () => {
+  // Fork (2026-09-11 audit, F1): a course is private unless published. A
+  // visitor to an unpublished course gets the same 404 as for an absent one —
+  // the route no longer confirms that the id names a real course.
+  it('answers 404 to a visitor while the course is unpublished', async () => {
     mocks.accessRow!.meta_owner_id = 'someone-else';
     const response = await getStageMeta(
       new NextRequest(`http://localhost/api/stage-meta/${STAGE_ID}`),
       stageMetaParams(STAGE_ID),
     );
-    await expect(response.json()).resolves.toMatchObject({ isOwner: false });
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'not_found' });
+  });
+
+  it('reports a visitor as non-owner once the course is published', async () => {
+    mocks.accessRow!.meta_owner_id = 'someone-else';
+    mocks.accessRow!.meta_is_public = true;
+    mocks.accessRow!.meta_published_at = 1_700_000_000_000;
+    const response = await getStageMeta(
+      new NextRequest(`http://localhost/api/stage-meta/${STAGE_ID}`),
+      stageMetaParams(STAGE_ID),
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ isOwner: false, isPublic: true });
   });
 
   it('answers 404 for an absent or tombstoned course', async () => {
@@ -113,7 +129,8 @@ describe('GET /api/stage-meta/[stageId]', () => {
 });
 
 describe('GET /api/stages/[id]/status', () => {
-  it('returns the public state without auth', async () => {
+  it('returns the public state to anyone once the course is published', async () => {
+    mocks.accessRow!.meta_owner_id = 'someone-else';
     mocks.accessRow!.meta_is_public = true;
     mocks.accessRow!.meta_published_at = 1_700_000_000_000;
     const response = await getStatus(
@@ -125,6 +142,27 @@ describe('GET /api/stages/[id]/status', () => {
       isPublic: true,
       publishedAt: 1_700_000_000_000,
     });
+  });
+
+  it('returns the private state to the owner', async () => {
+    const response = await getStatus(
+      new NextRequest(`http://localhost/api/stages/${STAGE_ID}/status`),
+      params(STAGE_ID),
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ isPublic: false, publishedAt: null });
+  });
+
+  // Fork (2026-09-11 audit, F1): upstream answered "any caller who has the
+  // stage ID"; here an unpublished course belongs to its owner alone.
+  it('answers 404 to a visitor while the course is unpublished', async () => {
+    mocks.accessRow!.meta_owner_id = 'someone-else';
+    const response = await getStatus(
+      new NextRequest(`http://localhost/api/stages/${STAGE_ID}/status`),
+      params(STAGE_ID),
+    );
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'not_found' });
   });
 
   it('answers 404 for a missing course', async () => {

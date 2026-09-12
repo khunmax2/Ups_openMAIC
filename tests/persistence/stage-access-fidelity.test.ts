@@ -98,7 +98,13 @@ describe('reference-fidelity stage access', () => {
     expect(provider.pool).toBe(pool);
   });
 
-  it('allows capability reads, refuses foreign writes, and filters the owner library', async () => {
+  // Fork (2026-09-11 audit, F1). Upstream's rule is "reads are capability-by-
+  // id": a visitor who knows the id may read. This deployment serves accounts
+  // that do not share, so a course is private unless its owner published it,
+  // and a visitor's read of an unpublished course is refused exactly like a
+  // foreign write -- and answers the same 404 as a missing one. Publishing is
+  // the one intended way to share; it opens reads and nothing else.
+  it('refuses foreign reads and writes while private, opens reads once published, filters the owner library', async () => {
     const connectionString = process.env.DATABASE_URL!;
     const { getServerPersistenceProvider } = await import('@/lib/persistence/server-provider');
     await getServerPersistenceProvider(connectionString, () => pool as never);
@@ -107,7 +113,9 @@ describe('reference-fidelity stage access', () => {
     const visitor = ownerStore(pool, `anon:${visitorCookie}`);
     await owner.saveDocument(courseDocument(stageId));
 
-    await expect(visitor.loadDocument(stageId)).resolves.toMatchObject({ stage: { id: stageId } });
+    // The store answers a refused read as it answers a missing one: null.
+    await expect(visitor.loadDocument(stageId)).resolves.toBeNull();
+    await expect(owner.loadDocument(stageId)).resolves.toMatchObject({ stage: { id: stageId } });
     await expect(
       visitor.saveDocument(courseDocument(stageId, 'Foreign edit')),
     ).rejects.toBeInstanceOf(StageAccessError);
@@ -118,8 +126,29 @@ describe('reference-fidelity stage access', () => {
       }),
       { poolFactory: () => pool as never },
     );
-    expect(visitorRead.status).toBe(200);
-    await expect(visitorRead.json()).resolves.toMatchObject({ stage: { id: stageId } });
+    expect(visitorRead.status).toBe(404);
+    await expect(visitorRead.json()).resolves.toMatchObject({
+      error: { code: 'DOCUMENT_NOT_FOUND' },
+    });
+
+    // The owner publishes: the visitor can now read -- by the store and by the
+    // persistence route -- but still not write, and still does not list it.
+    await pool.query(
+      'UPDATE stage_meta SET is_public = TRUE, published_at = $2 WHERE stage_id = $1',
+      [stageId, 1_800_000_000_000],
+    );
+    await expect(visitor.loadDocument(stageId)).resolves.toMatchObject({ stage: { id: stageId } });
+    const publishedRead = await handlePersistenceRequest(
+      new Request(`http://localhost/api/persistence/documents/${stageId}`, {
+        headers: { cookie: `anonymous_id=${visitorCookie}` },
+      }),
+      { poolFactory: () => pool as never },
+    );
+    expect(publishedRead.status).toBe(200);
+    await expect(publishedRead.json()).resolves.toMatchObject({ stage: { id: stageId } });
+    await expect(
+      visitor.saveDocument(courseDocument(stageId, 'Foreign edit')),
+    ).rejects.toBeInstanceOf(StageAccessError);
 
     const foreignWrite = await handlePersistenceRequest(
       new Request(`http://localhost/api/persistence/documents/${stageId}`, {
