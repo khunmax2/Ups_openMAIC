@@ -54,6 +54,13 @@ export async function GET(req: NextRequest, { params }: Params) {
       // scope inside its write transactions).
       const isOwner = access.ownerId === ownerId;
 
+      // Fork. A course is private unless published: to anyone but its owner
+      // an unpublished course is the same 404 as an absent one, here as in
+      // the document store (2026-09-11 audit, F1).
+      if (!isOwner && !access.isPublic) {
+        return NextResponse.json({ error: 'not_found' }, { status: 404, headers: responseHeaders });
+      }
+
       return NextResponse.json(
         {
           isOwner,

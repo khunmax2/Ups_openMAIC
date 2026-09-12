@@ -44,6 +44,7 @@ interface PendingOperation {
 interface RawOwnershipRow extends Record<string, unknown> {
   owner_id: string;
   deleted_at: Date | string | null;
+  is_public: boolean | null;
 }
 
 function queryableFor(connection: Pick<PoolClientLike, 'query'>): Queryable {
@@ -187,13 +188,23 @@ export function createOwnerBoundDocumentStore<
         if (operation?.stageId) {
           const lock = operation.mode === 'read' ? 'FOR SHARE' : 'FOR UPDATE';
           const result = await queryable.query<RawOwnershipRow>(
-            `SELECT owner_id, deleted_at FROM stage_meta WHERE stage_id = $1 ${lock}`,
+            `SELECT owner_id, deleted_at, is_public FROM stage_meta WHERE stage_id = $1 ${lock}`,
             [operation.stageId],
           );
           const row = result.rows[0];
           if (row) {
-            if (operation.mode !== 'read' && row.owner_id !== options.ownerId) {
-              throw new StageAccessError(operation.stageId, options.ownerId, 'foreign');
+            // Fork. Upstream lets any caller who knows a stage id read it
+            // (writes and listings are owner-only). This deployment serves
+            // accounts that do not share, so a course is private unless its
+            // owner published it: a foreign read of an unpublished course is
+            // refused the same way a foreign write is, and answers the same
+            // 404 as a missing one — no existence oracle. Publishing
+            // (`stage_meta.is_public`) is the one intended way to share.
+            // 2026-09-11 audit, F1.
+            if (row.owner_id !== options.ownerId) {
+              if (operation.mode !== 'read' || row.is_public !== true) {
+                throw new StageAccessError(operation.stageId, options.ownerId, 'foreign');
+              }
             }
             if (row.deleted_at !== null && operation.mode !== 'delete') {
               throw new StageAccessError(operation.stageId, options.ownerId, 'tombstoned');
