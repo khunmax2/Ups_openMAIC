@@ -51,6 +51,7 @@ import {
   paneAvailabilityRetryDelay,
   shouldResumeClassroomGeneration,
 } from '@/lib/classroom/progressive-load-policy';
+import { resolveClassroomViewerAccess } from '@/lib/classroom/viewer-access';
 
 const log = createLogger('Classroom');
 
@@ -90,6 +91,7 @@ export function ClassroomSurface({
   const [notFound, setNotFound] = useState(false);
 
   const generationStartedRef = useRef(false);
+  const resumeGate = useStageStore.use.resumeGate();
 
   const { generateRemaining, retrySingleOutline, stop } = useSceneGenerator({
     onComplete: () => {
@@ -145,6 +147,12 @@ export function ClassroomSurface({
           }
           outcome = 'unavailable';
         }
+        // Fork: ask the stage-meta sidecar who this viewer is -- its answer is
+        // the read-only gate and the resume gate. The page host always asked;
+        // this pane never did (lib/classroom/viewer-access.ts).
+        if (outcome === 'loaded' && isCurrent()) {
+          void resolveClassroomViewerAccess(classroomId, isCurrent);
+        }
         return isCurrent() ? outcome : 'cancelled';
       } catch (error) {
         log.error('Failed to load classroom:', error);
@@ -167,6 +175,8 @@ export function ClassroomSurface({
     setNotFound(false);
     /* eslint-enable react-hooks/set-state-in-effect */
     generationStartedRef.current = false;
+    // Fork: the new course's viewer is not known until its stage-meta answers.
+    useStageStore.getState().setResumeGate('unknown');
 
     // Clear previous classroom's media tasks to prevent cross-classroom contamination.
     // Placeholder IDs (gen_img_1, gen_vid_1) are NOT globally unique across stages,
@@ -221,6 +231,11 @@ export function ClassroomSurface({
   // `outlineProducer`: a course whose document a server job produced is
   // server-owned, not client-authored, and therefore not this browser's to
   // regenerate.
+  //
+  // Fork: this deployment does have server persistence and other viewers, so
+  // ownership also comes from the stage-meta sidecar (`resumeGate`). Both
+  // branches below generate with THIS viewer's models and keys; a visitor's
+  // writes are refused anyway, but the model calls would still run.
   useEffect(() => {
     if (
       !shouldResumeClassroomGeneration({
@@ -228,6 +243,7 @@ export function ClassroomSurface({
         error,
         transportPersistenceFenced: false,
         generationStarted: generationStartedRef.current,
+        resumeGate,
       })
     ) {
       return;
@@ -314,7 +330,7 @@ export function ClassroomSurface({
         log.warn('[Classroom] Media generation resume error:', err);
       });
     }
-  }, [loading, error, generateRemaining]);
+  }, [loading, error, generateRemaining, resumeGate]);
 
   return (
     <ThemeProvider>

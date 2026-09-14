@@ -348,6 +348,39 @@ while the answer is applied.
 Tests: `tests/server/credentials.test.ts`, `tests/credentials/client.test.ts`
 (nine new cases, red before the change), both now in `fork-ci.yml`.
 
+### Only the course's owner resumes its generation
+
+The classroom resumes an interrupted generation on mount: missing slides
+(`generateRemaining`) and, on a deck that has all its slides, missing media
+(`generateMediaForOutlines`). Both run with the **viewer's** models and keys.
+Upstream is single-user, so it never asks who the viewer is -- the workbench
+pane's own comment says as much. Here every course loads from the server in any
+browser, and found by the 2026-09-14 audit:
+
+- a course loaded from the server gets `generationComplete: false`
+  (`applyClassroomStageAndScenes`), and the server's own flag was never set --
+  `POST /api/stages/:id/generation-complete` had no caller;
+- so anyone opening a course with a missing slide (an unfinished generation,
+  or a slide deleted afterwards) started generating it with their own model,
+  a learner on a published course included, and opening a finished course in a
+  new browser regenerated every image, because the generated media lives only
+  in the creator's browser. The server refuses the visitor's writes (audit F1);
+  the model calls still ran.
+
+The fix is a resume gate (`lib/classroom/progressive-load-policy.ts`):
+`unknown` until the stage-meta sidecar answers, `allowed` for the owner or for a
+course with no sidecar row (local-only, or no server persistence -- upstream's
+case), `denied` for a visitor or when the sidecar does not answer (fail closed;
+a reload asks again). `lib/classroom/viewer-access.ts` asks the sidecar for both
+hosts: the page always did, the workbench pane never did. When the owner's deck
+finishes, `lib/classroom/generation-complete-mirror.ts` sets the server's flag.
+
+Tests: `tests/classroom/progressive-load-policy.test.ts`,
+`tests/classroom/viewer-access.test.ts`,
+`tests/classroom/generation-complete-mirror.test.ts`,
+`tests/store/stage-generation-complete-mirror.test.ts` (red before the change),
+all in `fork-ci.yml`.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

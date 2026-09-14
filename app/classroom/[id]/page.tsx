@@ -15,8 +15,8 @@ import { createLogger } from '@/lib/logger';
 import { MediaStageProvider } from '@/lib/contexts/media-stage-context';
 import { generateMediaForOutlines } from '@/lib/media/media-orchestrator';
 import { useAgentRegistry } from '@/lib/orchestration/registry/store';
-import { fetchStageMeta } from '@/lib/classroom/stage-meta-client';
-import { noteStageOwnership } from '@/lib/classroom/stage-ownership-signal';
+import { shouldResumeClassroomGeneration } from '@/lib/classroom/progressive-load-policy';
+import { resolveClassroomViewerAccess } from '@/lib/classroom/viewer-access';
 import {
   applyClassroomStageAndScenes,
   defaultClassroomLoadDeps,
@@ -35,6 +35,7 @@ export default function ClassroomDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const generationStartedRef = useRef(false);
+  const resumeGate = useStageStore.use.resumeGate();
 
   const { generateRemaining, retrySingleOutline, stop } = useSceneGenerator({
     onComplete: () => {
@@ -79,31 +80,11 @@ export default function ClassroomDetailPage() {
       // document seam does not carry — `isOwner` decides read-only vs editable
       // (see `stage-meta-client.ts`). Run it strictly AFTER the load applied
       // its defaults so its answer wins, and fire it without blocking the
-      // render that already happened.
+      // render that already happened. Fork: its answer is also the resume
+      // gate, and the workbench pane asks through the same helper
+      // (lib/classroom/viewer-access.ts).
       if (isEffectCurrent()) {
-        void fetchStageMeta(classroomId)
-          .then((result) => {
-            if (!isEffectCurrent()) return;
-            if (result.outcome === 'found') {
-              noteStageOwnership(classroomId, true, {
-                isOwner: result.meta.isOwner,
-              });
-              useStageStore.getState().setViewerAccess({
-                isOwner: result.meta.isOwner,
-              });
-            } else if (result.outcome === 'unavailable') {
-              // A silent sidecar is not "this is a stranger's course": record
-              // the outage so nothing treats `isOwner === false` as a visitor
-              // conclusion. The edit gate stays on the upstream defaults.
-              noteStageOwnership(classroomId, false, null);
-            } else {
-              // 'absent' — no sidecar row for this id. This classroom also
-              // serves local-only courses, so the upstream editable default
-              // stays; the server's owner-scoped writes remain the authority.
-              noteStageOwnership(classroomId, true, null);
-            }
-          })
-          .catch(() => noteStageOwnership(classroomId, false, null));
+        void resolveClassroomViewerAccess(classroomId, isEffectCurrent);
       }
     },
     [classroomId, loadFromStorage],
@@ -117,6 +98,8 @@ export default function ClassroomDetailPage() {
     setError(null);
     /* eslint-enable react-hooks/set-state-in-effect */
     generationStartedRef.current = false;
+    // Fork: the new course's viewer is not known until its stage-meta answers.
+    useStageStore.getState().setResumeGate('unknown');
 
     // Clear previous classroom's media tasks to prevent cross-classroom contamination.
     // Placeholder IDs (gen_img_1, gen_vid_1) are NOT globally unique across stages,
@@ -138,9 +121,21 @@ export default function ClassroomDetailPage() {
     };
   }, [classroomId, loadClassroom, stop]);
 
-  // Auto-resume generation for pending outlines
+  // Auto-resume generation for pending outlines. Fork: owner only -- both
+  // branches below (missing slides, missing media) generate with THIS
+  // viewer's models and keys, so a visitor never resumes (`resumeGate`).
   useEffect(() => {
-    if (loading || error || generationStartedRef.current) return;
+    if (
+      !shouldResumeClassroomGeneration({
+        loading,
+        error,
+        transportPersistenceFenced: false,
+        generationStarted: generationStartedRef.current,
+        resumeGate,
+      })
+    ) {
+      return;
+    }
 
     const state = useStageStore.getState();
     const { outlines, scenes, stage, generationComplete } = state;
@@ -218,7 +213,7 @@ export default function ClassroomDetailPage() {
         log.warn('[Classroom] Media generation resume error:', err);
       });
     }
-  }, [loading, error, generateRemaining]);
+  }, [loading, error, generateRemaining, resumeGate]);
 
   return (
     <ThemeProvider>

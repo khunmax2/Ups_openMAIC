@@ -10,6 +10,8 @@ import {
   type GeneratedAgentConfig,
 } from '@/lib/types/stage';
 import { createSelectors } from '@/lib/utils/create-selectors';
+import type { ResumeGate } from '@/lib/classroom/progressive-load-policy';
+import { notifyServerGenerationComplete } from '@/lib/classroom/generation-complete-mirror';
 import type { ChatSession } from '@/lib/types/chat';
 import type { SceneOutline } from '@/lib/types/generation';
 import { createLogger } from '@/lib/logger';
@@ -317,6 +319,13 @@ interface StageState {
   readOnly: boolean;
 
   /**
+   * Fork. May this viewer resume the course's generation? `unknown` until the
+   * stage-meta sidecar answers for the loaded course (see
+   * `lib/classroom/viewer-access.ts`). Viewer-scoped, not persisted.
+   */
+  resumeGate: ResumeGate;
+
+  /**
    * Who produced the current outline ('client' absent / 'server-job'), written
    * by the workbench stage-freshness sync's delegated initial read. Absent
    * from the host's original store; the reference carries it so a server-owned
@@ -363,6 +372,8 @@ interface StageState {
    * read-only classroom.
    */
   setViewerAccess: (access: { isOwner: boolean }) => void;
+  /** Fork: set by the stage-meta answer, reset to `unknown` when a classroom load starts. */
+  setResumeGate: (gate: ResumeGate) => void;
   setGenerationStatus: (status: 'idle' | 'generating' | 'paused' | 'completed' | 'error') => void;
   setCurrentGeneratingOrder: (order: number) => void;
   bumpGenerationEpoch: () => void;
@@ -480,6 +491,7 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
   outlineProducer: null,
   isOwner: true,
   readOnly: false,
+  resumeGate: 'unknown',
   generationEpoch: 0,
   generationStatus: 'idle' as const,
   currentGeneratingOrder: -1,
@@ -773,6 +785,12 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
     set({ generationComplete });
     // Final scenes and the completion barrier commit in the same aggregate write.
     void get().saveToStorage();
+    // Fork: keep the server's own flag truthful -- the owner's deck only; the
+    // route refuses anyone else anyway.
+    const stageId = get().stage?.id;
+    if (generationComplete && get().isOwner && stageId) {
+      void notifyServerGenerationComplete(stageId);
+    }
   },
 
   markGenerationCompleteIfDone: () => {
@@ -784,6 +802,8 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
   setViewerAccess: ({ isOwner }) => {
     set({ isOwner, readOnly: !isOwner });
   },
+
+  setResumeGate: (resumeGate) => set({ resumeGate }),
 
   setGenerationStatus: (generationStatus) => set({ generationStatus }),
 
