@@ -437,12 +437,26 @@ visit retries; uploads are content-addressed, so a retry never duplicates a
 file. A course the owner never reopens in its creating browser keeps its media
 there: nothing on the server can reach those bytes.
 
+When the owner opens a course in a browser that holds none of its media, the
+classroom's resume asks the orchestrator for every image the outlines declare,
+because this browser's media tasks come from its own IndexedDB only. Images the
+course already has a served copy of (`mediaAssets`) are skipped, so that visit
+no longer spends the image model or replaces the pictures (found 2026-09-15).
+An image with no served copy -- an older course whose creating browser is gone
+-- is still regenerated from its prompt, which is how such a course gets
+pictures back: new ones, not the originals. Narration is not regenerated
+automatically. A line without audio plays as text for its reading time (or
+through browser TTS when that is the selected provider), and the owner
+re-voices it from the edit timeline ("Voice all" per scene, or one line), which
+stores the new clip on the server.
+
 Tests: `tests/agent-runtime/stage-media-upload-route.test.ts`,
 `tests/media/persist-generated-media.test.ts`,
 `tests/audio/audio-player-server-audio-id.test.ts`,
 `tests/media/stage-media-assets.test.ts`,
 `tests/store/stage-media-assets-store.test.ts`,
-`tests/media/migrate-stage-media.test.ts` (red before the change).
+`tests/media/migrate-stage-media.test.ts`,
+`tests/media/media-orchestrator-served-copies.test.ts` (red before the change).
 
 ### A custom TTS provider is only sent a voice it lists
 

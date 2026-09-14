@@ -88,3 +88,4 @@ jobs:
           tests/store/account-kv.test.ts
           tests/media/media-orchestrator-concurrency.test.ts
           tests/server/media-generation-concurrency.test.ts
+          tests/media/media-orchestrator-served-copies.test.ts
