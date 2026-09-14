@@ -316,6 +316,38 @@ decodes by what that name claims fails on WAV called WebM.
 Tests: `tests/audio/wav-utils.test.ts`, `tests/audio/custom-asr.test.ts` (three
 new cases, red before the change), both now in `fork-ci.yml`.
 
+### A shared custom provider travels with its definition
+
+Sharing a key (the admin action in "API keys live on the server", above) put a
+key and a URL on a default row, and every account's server-side lookups found
+it. No account's *browser* could show it, though, when the provider was one
+somebody had added by hand: a custom TTS, ASR or LLM provider exists as an
+entry in the adding browser's storage and nowhere else, so the shared row named
+a provider id the other browsers had never heard of. Found 2026-09-14 when a
+promoted admin could not see a custom TTS the first admin had shared. The same
+gap left a shared "OpenAI Compatible" image key without a model: the model
+name lives in each browser's own list, and image generation failed with
+"requires a model to be configured".
+
+A default row now carries a `profile` (new `profile` column, added with
+`ADD COLUMN IF NOT EXISTS`): the provider's definition -- name, endpoint,
+voices, models -- or, for a built-in image/video provider, the models the admin
+added. Never a key: the route drops anything that looks like one, refuses a
+profile on an owner row, and caps it at 64 KiB. The browser
+(`lib/credentials/client.ts`) sends it when an admin shares, builds a provider
+it lacks from it (marked `fromShare`), fills an empty model list from it, and
+drops what it built when the share goes -- unless it is the provider in use.
+A share made before this has no profile; the sharing admin's own browser (its
+own row is the shared one) fills it in once, at the next boot.
+
+While there: applying the server's answer rewrites base URLs in the store, and
+the store watcher could read that as the person typing and write a URL-only
+own row that shadows the shared key. The watcher now ignores changes made
+while the answer is applied.
+
+Tests: `tests/server/credentials.test.ts`, `tests/credentials/client.test.ts`
+(nine new cases, red before the change), both now in `fork-ci.yml`.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

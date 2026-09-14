@@ -42,6 +42,10 @@ export interface ProviderSettings {
   // deliberately NOT exposed to the client.
   isServerConfigured?: boolean; // Server manages this provider's credentials
   serverModels?: string[]; // Server-restricted model list (if set)
+
+  // Fork: built from an admin's share (lib/credentials/client.ts); goes when
+  // the share does.
+  fromShare?: boolean;
 }
 
 /**

@@ -28,9 +28,9 @@ import { Input } from '@/components/ui/input';
 import {
   CREDENTIAL_SENTINEL,
   metaKey,
-  putCredential,
   refreshCredentials,
   removeCredential,
+  shareCredential,
   type CredentialSection,
 } from '@/lib/credentials/client';
 import { useI18n } from '@/lib/hooks/use-i18n';
@@ -114,14 +114,11 @@ export function ApiKeyField({
     withBusy(() => removeCredential(credential!.section, credential!.providerId));
   const stopSharing = () =>
     withBusy(() => removeCredential(credential!.section, credential!.providerId, 'default'));
+  // The provider's definition goes with the key, so an account whose browser
+  // never added the provider can still see and use it (lib/credentials/client.ts).
   const share = () =>
     withBusy(async () => {
-      const stored = await putCredential(
-        credential!.section,
-        credential!.providerId,
-        { copyFromOwner: true },
-        'default',
-      );
+      const stored = await shareCredential(credential!.section, credential!.providerId);
       return stored !== undefined;
     });
 

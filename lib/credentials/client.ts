@@ -19,7 +19,13 @@
  *   it travels with the key all the same: the server pairs a stored key only
  *   with the stored URL (audit F2), so a row without one is a key with
  *   nowhere to go. Rows stored before this carried no URL; boot fills them
- *   in, once.
+ *   in, once;
+ * - a custom provider exists only in the browser that added it, so a shared
+ *   key carries the provider's definition (`profile`: name, endpoint, voices,
+ *   models -- never a key). Another account's browser builds the provider
+ *   from it, fills an empty model list from it, and drops what it built when
+ *   the share goes. A share made before profiles travelled is filled in by
+ *   the sharing admin's own browser, once.
  *
  * With no database behind the studio (`storage: 'none'`) none of this runs
  * and the browser keeps its keys, which is upstream's shape.
@@ -59,6 +65,58 @@ const STORE_KEY: Record<CredentialSection, keyof SettingsState> = {
   webSearch: 'webSearchProvidersConfig',
 };
 
+/** What travels with a shared key so another browser can show the provider. Never a key. */
+export type ProviderProfile = Record<string, unknown>;
+
+// The fields of an entry that describe the provider rather than configure it
+// for one person: a custom provider's whole definition, or the model list an
+// admin added to a built-in image/video provider.
+const PROFILE_FIELDS: Record<CredentialSection, readonly string[]> = {
+  providers: [
+    'name',
+    'type',
+    'defaultBaseUrl',
+    'icon',
+    'requiresApiKey',
+    'models',
+    'modelsUrl',
+    'isBuiltIn',
+  ],
+  tts: [
+    'customName',
+    'customDefaultBaseUrl',
+    'requiresApiKey',
+    'modelId',
+    'customVoices',
+    'customModels',
+    'isBuiltIn',
+  ],
+  asr: [
+    'customName',
+    'customDefaultBaseUrl',
+    'requiresApiKey',
+    'modelId',
+    'customModels',
+    'isBuiltIn',
+  ],
+  pdf: [],
+  image: ['customModels', 'replaceBuiltInModels'],
+  video: ['customModels', 'replaceBuiltInModels'],
+  webSearch: [],
+};
+
+// The sections whose providers can be user-defined -- and so can be missing
+// from a browser that never added them -- with the store field naming the one
+// in use.
+const SELECTED_KEY: Partial<Record<CredentialSection, keyof SettingsState>> = {
+  providers: 'providerId',
+  tts: 'ttsProviderId',
+  asr: 'asrProviderId',
+};
+
+/** Stay under the server's limit; a share without its profile still shares the key. */
+const PROFILE_LIMIT = 60_000;
+
 export interface StoredCredentialMeta {
   masked: string;
   baseUrl: string;
@@ -72,10 +130,12 @@ export function metaKey(section: CredentialSection, providerId: string): string 
 }
 
 type Fields = { apiKey?: string; baseUrl?: string; enabled?: boolean };
-type Entry = Fields & { customDefaultBaseUrl?: string };
+type Entry = Fields & { customDefaultBaseUrl?: string; fromShare?: boolean };
 
-/** What PUT accepts: the fields, or an admin's request to copy their own row. */
-export type CredentialPatch = Fields & { copyFromOwner?: boolean };
+/** What PUT accepts: the fields, an admin's request to copy their own row, a profile. */
+export type CredentialPatch = Fields & { copyFromOwner?: boolean; profile?: ProviderProfile };
+
+type SharedRow = { masked: string; baseUrl: string; profile?: ProviderProfile };
 
 /**
  * The endpoint this entry's key is used with -- the same URL the page sends
@@ -97,7 +157,7 @@ interface ListResponse {
   role: 'admin' | 'user';
   storage: 'server' | 'none';
   own: Partial<Record<CredentialSection, Record<string, { masked: string; baseUrl: string }>>>;
-  defaults: Partial<Record<CredentialSection, Record<string, { masked: string; baseUrl: string }>>>;
+  defaults: Partial<Record<CredentialSection, Record<string, SharedRow>>>;
 }
 
 async function listFromServer(): Promise<ListResponse | undefined> {
@@ -150,17 +210,130 @@ export async function removeCredential(
   }
 }
 
+/** The describing fields of an entry or a received profile, and nothing else. */
+function pickFields(section: CredentialSection, source: Record<string, unknown>): ProviderProfile {
+  const picked: ProviderProfile = {};
+  for (const field of PROFILE_FIELDS[section]) {
+    if (source[field] !== undefined) picked[field] = source[field];
+  }
+  return picked;
+}
+
+/**
+ * The profile an entry would share, if it has one: a custom provider's
+ * definition, or a built-in image/video provider's added models. A built-in
+ * provider otherwise has nothing another browser lacks.
+ */
+function pickProfile(
+  section: CredentialSection,
+  entry: Record<string, unknown> | undefined,
+): ProviderProfile | undefined {
+  if (!entry) return undefined;
+  if (SELECTED_KEY[section] && entry.isBuiltIn !== false) return undefined;
+  const profile = pickFields(section, entry);
+  if (section === 'image' || section === 'video') {
+    const models = profile.customModels;
+    if (!Array.isArray(models) || models.length === 0) return undefined;
+  }
+  return Object.keys(profile).length > 0 ? profile : undefined;
+}
+
+/** The profile this browser would share for a provider, if it has one to share. */
+export function profileFor(
+  section: CredentialSection,
+  providerId: string,
+): ProviderProfile | undefined {
+  const entry = sectionEntries(useSettingsStore.getState(), section)[providerId];
+  const profile = pickProfile(section, entry as Record<string, unknown> | undefined);
+  if (!profile || JSON.stringify(profile).length > PROFILE_LIMIT) return undefined;
+  return profile;
+}
+
+/** An admin shares their own key with every account, and the provider's definition with it. */
+export async function shareCredential(
+  section: CredentialSection,
+  providerId: string,
+): Promise<{ masked: string; baseUrl: string } | null | undefined> {
+  const profile = profileFor(section, providerId);
+  return putCredential(
+    section,
+    providerId,
+    { copyFromOwner: true, ...(profile ? { profile } : {}) },
+    'default',
+  );
+}
+
 function metaFrom(list: ListResponse): CredentialMeta {
   const meta: CredentialMeta = {};
   for (const section of CREDENTIAL_SECTIONS) {
     for (const [id, row] of Object.entries(list.defaults[section] ?? {})) {
-      meta[metaKey(section, id)] = { ...row, source: 'default' };
+      meta[metaKey(section, id)] = { masked: row.masked, baseUrl: row.baseUrl, source: 'default' };
     }
     for (const [id, row] of Object.entries(list.own[section] ?? {})) {
-      meta[metaKey(section, id)] = { ...row, source: 'own' };
+      meta[metaKey(section, id)] = { masked: row.masked, baseUrl: row.baseUrl, source: 'own' };
     }
   }
   return meta;
+}
+
+function isEmpty(value: unknown): boolean {
+  return value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
+}
+
+/** What a shared profile adds to an entry the browser has: only what the entry leaves empty. */
+function fillFrom(
+  section: CredentialSection,
+  entry: Record<string, unknown>,
+  profile: ProviderProfile | undefined,
+): Record<string, unknown> {
+  if (!profile) return {};
+  const out: Record<string, unknown> = {};
+  for (const field of PROFILE_FIELDS[section]) {
+    if (profile[field] !== undefined && isEmpty(entry[field])) out[field] = profile[field];
+  }
+  return out;
+}
+
+/** A provider this browser never added, built from the profile an admin shared with its key. */
+function materialize(section: CredentialSection, row: SharedRow): Entry | undefined {
+  // A provider missing from this browser is a custom one by definition; the
+  // profile need not say so, only describe it.
+  if (!row.profile) return undefined;
+  const profile = pickFields(section, row.profile);
+  const common = { apiKey: CREDENTIAL_SENTINEL, baseUrl: row.baseUrl, fromShare: true };
+  if (section === 'providers') {
+    if (
+      typeof profile.name !== 'string' ||
+      typeof profile.type !== 'string' ||
+      !Array.isArray(profile.models)
+    ) {
+      return undefined;
+    }
+    return { requiresApiKey: false, ...profile, isBuiltIn: false, ...common } as Entry;
+  }
+  if (section === 'tts') {
+    return {
+      enabled: true,
+      modelId: '',
+      customVoices: [],
+      requiresApiKey: false,
+      ...profile,
+      isBuiltIn: false,
+      ...common,
+    } as Entry;
+  }
+  if (section === 'asr') {
+    return {
+      enabled: true,
+      modelId: '',
+      customModels: [],
+      requiresApiKey: false,
+      ...profile,
+      isBuiltIn: false,
+      ...common,
+    } as Entry;
+  }
+  return undefined;
 }
 
 /** Rewrite one section's entries to reflect what the server holds. */
@@ -169,6 +342,8 @@ function reconcileSection(
   section: CredentialSection,
   meta: CredentialMeta,
   previousMeta: CredentialMeta,
+  defaults: SettingsState['credentialDefaults'],
+  selectedId: string | undefined,
 ): Record<string, Entry> {
   const next: Record<string, Entry> = {};
   for (const [id, entry] of Object.entries(entries)) {
@@ -183,6 +358,7 @@ function reconcileSection(
       const firstSeen = !previousMeta[key];
       next[id] = {
         ...entry,
+        ...fillFrom(section, entry as Record<string, unknown>, defaults[key]?.profile),
         apiKey: CREDENTIAL_SENTINEL,
         // The server's base URL is what the key is used with; an empty one
         // means the provider's default, which the page already knows.
@@ -195,10 +371,22 @@ function reconcileSection(
       // together, so both go: a base URL left behind would sit in the field
       // as though it were the person's own setting, and for a provider with
       // a real default (api.openai.com) hide that default's placeholder.
+      // A provider this browser only had because it was shared goes with
+      // the share -- unless it is the one in use, which keeps its place.
+      if (entry.fromShare && id !== selectedId) continue;
       next[id] = { ...entry, apiKey: '', baseUrl: '' };
     } else {
       next[id] = entry;
     }
+  }
+  // Shared providers this browser has never seen, built from their profile.
+  const prefix = `${section}:`;
+  for (const [key, row] of Object.entries(defaults)) {
+    if (!key.startsWith(prefix)) continue;
+    const id = key.slice(prefix.length);
+    if (!id || id in next) continue;
+    const built = materialize(section, row);
+    if (built) next[id] = built;
   }
   return next;
 }
@@ -213,28 +401,42 @@ function defaultsFrom(list: ListResponse): SettingsState['credentialDefaults'] {
   return out;
 }
 
+// While the store is being rewritten from what the server said, the watcher
+// must not read the rewrite as the person typing: a base URL copied in from a
+// shared row would otherwise be written back as an own row of its own, and an
+// own row -- even a URL-only one -- shadows the shared key.
+let applying = false;
+
 function applyMeta(
   meta: CredentialMeta,
   role: 'admin' | 'user',
   defaults: SettingsState['credentialDefaults'],
 ) {
-  useSettingsStore.setState((state) => {
-    const patch: Partial<SettingsState> = {
-      credentialStorage: 'server',
-      credentialRole: role,
-      credentialMeta: meta,
-      credentialDefaults: defaults,
-    };
-    for (const section of CREDENTIAL_SECTIONS) {
-      (patch as Record<string, unknown>)[STORE_KEY[section]] = reconcileSection(
-        sectionEntries(state, section),
-        section,
-        meta,
-        state.credentialMeta ?? {},
-      );
-    }
-    return patch;
-  });
+  applying = true;
+  try {
+    useSettingsStore.setState((state) => {
+      const patch: Partial<SettingsState> = {
+        credentialStorage: 'server',
+        credentialRole: role,
+        credentialMeta: meta,
+        credentialDefaults: defaults,
+      };
+      for (const section of CREDENTIAL_SECTIONS) {
+        const selectedKey = SELECTED_KEY[section];
+        (patch as Record<string, unknown>)[STORE_KEY[section]] = reconcileSection(
+          sectionEntries(state, section),
+          section,
+          meta,
+          state.credentialMeta ?? {},
+          defaults,
+          selectedKey ? String(state[selectedKey] ?? '') : undefined,
+        );
+      }
+      return patch;
+    });
+  } finally {
+    applying = false;
+  }
 }
 
 /**
@@ -284,6 +486,27 @@ async function backfillEndpoints(meta: CredentialMeta): Promise<CredentialMeta> 
   return next;
 }
 
+/**
+ * A share made before profiles travelled holds a key and a URL for a provider
+ * only the sharer's browser can describe. That browser -- an admin's, whose
+ * own row is the shared one -- sends the description, once: the filled row
+ * then has a profile and is skipped.
+ */
+async function backfillSharedProfiles(list: ListResponse): Promise<void> {
+  if (list.role !== 'admin') return;
+  for (const section of CREDENTIAL_SECTIONS) {
+    for (const [id, shared] of Object.entries(list.defaults[section] ?? {})) {
+      if (shared.profile) continue;
+      const own = list.own[section]?.[id];
+      if (!own || own.masked !== shared.masked || own.baseUrl !== shared.baseUrl) continue;
+      const profile = profileFor(section, id);
+      if (!profile) continue;
+      const stored = await putCredential(section, id, { profile }, 'default');
+      if (stored !== undefined) shared.profile = profile;
+    }
+  }
+}
+
 let syncStarted = false;
 const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -295,7 +518,7 @@ const pending = new Map<string, ReturnType<typeof setTimeout>>();
 function watchStore() {
   let previous = useSettingsStore.getState();
   useSettingsStore.subscribe((state) => {
-    if (state.credentialStorage !== 'server') {
+    if (state.credentialStorage !== 'server' || applying) {
       previous = state;
       return;
     }
@@ -365,6 +588,7 @@ export async function startCredentialSync(): Promise<void> {
     return;
   }
   const meta = await backfillEndpoints(await migrateStoredKeys(metaFrom(list)));
+  await backfillSharedProfiles(list);
   applyMeta(meta, list.role, defaultsFrom(list));
   watchStore();
 }

@@ -16,6 +16,7 @@ type Row = {
   provider_id: string;
   api_key: string;
   base_url: string;
+  profile?: string;
 };
 
 function memoryQueryable(rows: Row[] = []): Queryable & { rows: Row[] } {
@@ -28,7 +29,7 @@ function memoryQueryable(rows: Row[] = []): Queryable & { rows: Row[] } {
       params: unknown[] = [],
     ): Promise<QueryResult<T>> {
       const p = params as string[];
-      if (text.startsWith('CREATE')) return { rows: [] };
+      if (text.startsWith('CREATE') || text.startsWith('ALTER')) return { rows: [] };
       if (text.includes("WHERE (scope = 'owner' AND owner_id = $1) OR scope = 'default'")) {
         return {
           rows: rows.filter(
@@ -55,6 +56,7 @@ function memoryQueryable(rows: Row[] = []): Queryable & { rows: Row[] } {
           provider_id: p[3]!,
           api_key: p[4]!,
           base_url: p[5]!,
+          ...(p[6] ? { profile: p[6] } : {}),
         };
         const i = rows.findIndex((r) => key(r) === key(next));
         if (i >= 0) rows[i] = next;
@@ -158,6 +160,29 @@ describe('credential store', () => {
         base_url: '',
       },
     ]);
+  });
+
+  // Fork. A shared custom provider exists only in the browser that added it;
+  // its definition has to travel with the key or nobody else can use it.
+  it("keeps a shared default's provider profile through a later key edit", async () => {
+    const { upsertCredential, listCredentials } = await import('@/lib/server/credentials/store');
+    const q = memoryQueryable();
+    const address = {
+      scope: 'default' as const,
+      ownerId: 'user:boss',
+      section: 'tts' as const,
+      providerId: 'custom-tts-1',
+    };
+    const profile = { customName: 'MyTTS', customVoices: [{ id: 'v1', name: 'V1' }] };
+    await upsertCredential(q, address, { apiKey: 'sk-1', baseUrl: 'http://tts/v1', profile });
+    await upsertCredential(q, address, { apiKey: 'sk-2' });
+
+    const set = await listCredentials(q, 'user:someone');
+    expect(set.defaults.tts?.['custom-tts-1']).toEqual({
+      apiKey: 'sk-2',
+      baseUrl: 'http://tts/v1',
+      profile,
+    });
   });
 
   it('masks a key the way DeepWitya does', async () => {
@@ -473,6 +498,65 @@ describe('credential routes', () => {
     );
     expect(del.status).toBe(403);
     expect(q.rows).toHaveLength(1);
+  });
+
+  it("shares a provider's profile with the key, and every account sees it", async () => {
+    const { handleWrite, handleList } = await armRoutes([
+      {
+        scope: 'owner',
+        owner_id: 'user:boss',
+        section: 'tts',
+        provider_id: 'custom-tts-1',
+        api_key: 'sk-boss-000000000-abcd',
+        base_url: 'http://tts.internal/v1',
+      },
+    ]);
+    const res = await handleWrite(
+      new Request('http://s/x', {
+        method: 'PUT',
+        headers: { ...as('user:boss', 'admin'), 'content-type': 'application/json' },
+        body: JSON.stringify({
+          copyFromOwner: true,
+          profile: {
+            customName: 'MyTTS',
+            customDefaultBaseUrl: 'http://tts.internal/v1',
+            customVoices: [{ id: 'nova', name: 'Nova' }],
+            apiKey: 'smuggled-into-the-profile',
+          },
+        }),
+      }),
+      ['default', 'tts', 'custom-tts-1'],
+    );
+    expect(res.status).toBe(200);
+
+    const list = await (
+      await handleList(
+        new Request('http://s/api/studio/credentials', { headers: as('user:demo', 'admin') }),
+      )
+    ).json();
+    expect(list.defaults.tts['custom-tts-1']).toEqual({
+      masked: 'sk-bo••••abcd',
+      baseUrl: 'http://tts.internal/v1',
+      profile: {
+        customName: 'MyTTS',
+        customDefaultBaseUrl: 'http://tts.internal/v1',
+        customVoices: [{ id: 'nova', name: 'Nova' }],
+      },
+    });
+    expect(JSON.stringify(list)).not.toContain('smuggled');
+  });
+
+  it("refuses a profile on an account's own row", async () => {
+    const { handleWrite } = await armRoutes();
+    const res = await handleWrite(
+      new Request('http://s/x', {
+        method: 'PUT',
+        headers: { ...as('user:a'), 'content-type': 'application/json' },
+        body: JSON.stringify({ apiKey: 'sk-live-1234567890-abcd', profile: { customName: 'x' } }),
+      }),
+      ['tts', 'custom-tts-1'],
+    );
+    expect(res.status).toBe(400);
   });
 
   it('rejects an unknown section and a malformed provider id', async () => {
