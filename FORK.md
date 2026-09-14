@@ -293,6 +293,29 @@ Two things this deliberately does not do:
 Reverting needs no rebuild of anything else: the templates are read with
 `fs.readFileSync` per call and ship into the image as files.
 
+### A custom speech-recognition server is sent WAV, not WebM
+
+A custom (OpenAI-compatible) ASR pointed at a LiteLLM gateway passed its Run
+test and then refused every real recording: `422 … Failed to decode audio:
+Error opening '/tmp/….webm': Format not recognised`. The browser records WebM;
+the gateway decodes with libsndfile, which has no WebM. DeepWitya hit the same
+wall with the same server (its PR #96) and converts on its server; this image
+carries no ffmpeg, so the conversion happens where the recording is made.
+
+Upstream already had the mechanism: `normalizeASRUploadAudio`
+(`lib/audio/wav-utils.ts`) decodes the recording in the browser and re-encodes
+it as mono PCM WAV for the two providers that read nothing else, FunASR and
+Lemonade. Custom providers (`custom-asr-*`) join that list. Hosted providers
+(OpenAI, Qwen, Azure) keep receiving what they received before.
+
+The server half: `transcribeCustomOpenAICompatibleASR` named every upload
+`audio.webm`, whatever it held. The name now follows the bytes (`audio.wav`
+for WAV), since a gateway that saves the upload under the given name and
+decodes by what that name claims fails on WAV called WebM.
+
+Tests: `tests/audio/wav-utils.test.ts`, `tests/audio/custom-asr.test.ts` (three
+new cases, red before the change), both now in `fork-ci.yml`.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

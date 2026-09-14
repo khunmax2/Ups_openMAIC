@@ -68,3 +68,5 @@ jobs:
           tests/base-path
           tests/persistence
           tests/agent-runtime/studio-identity.test.ts
+          tests/audio/wav-utils.test.ts
+          tests/audio/custom-asr.test.ts

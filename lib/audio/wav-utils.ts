@@ -1,5 +1,7 @@
 'use client';
 
+import { isCustomASRProvider } from '@/lib/audio/types';
+
 function writeAscii(view: DataView, offset: number, value: string): void {
   for (let i = 0; i < value.length; i++) {
     view.setUint8(offset + i, value.charCodeAt(i));
@@ -73,11 +75,21 @@ export async function audioBlobToWav(blob: Blob): Promise<Blob> {
   }
 }
 
+// Fork: custom (OpenAI-compatible) ASR joins the WAV list. Such a server is
+// often a LiteLLM gateway decoding with libsndfile, which has no WebM, and the
+// browser can decode its own recording where the studio server cannot (the
+// image carries no ffmpeg). WAV is the one format every one of them reads.
+function uploadsAsWav(providerId: string): boolean {
+  return (
+    providerId === 'lemonade-asr' || providerId === 'funasr-asr' || isCustomASRProvider(providerId)
+  );
+}
+
 export async function normalizeASRUploadAudio(
   providerId: string,
   audioBlob: Blob,
 ): Promise<{ blob: Blob; fileName: string }> {
-  if (providerId !== 'lemonade-asr' && providerId !== 'funasr-asr') {
+  if (!uploadsAsWav(providerId)) {
     return { blob: audioBlob, fileName: 'recording.webm' };
   }
   return { blob: await audioBlobToWav(audioBlob), fileName: 'recording.wav' };
