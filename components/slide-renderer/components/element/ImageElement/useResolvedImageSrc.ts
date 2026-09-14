@@ -14,6 +14,8 @@ import { isGeneratedMediaPlaceholder } from '@/lib/media/media-ref';
 import { useMediaGenerationStore, type MediaTask } from '@/lib/store/media-generation';
 import { useSettingsStore } from '@/lib/store/settings';
 import { resolveMediaTaskForElement } from '@/lib/media/media-task-resolution';
+import { mediaRefForPlaceholder } from '@/lib/media/stage-media-assets';
+import { useStageStore } from '@/lib/store/stage';
 
 export interface ResolvedImageSrc {
   /**
@@ -88,7 +90,20 @@ export function useResolvedImageSrc(elementInfo: PPTImageElement): ResolvedImage
   const task = useMediaGenerationStore((state) =>
     resolveMediaTaskForElement(state.tasks, elementInfo, stageId),
   );
-  const resolution = useResolvedMediaRef(elementInfo.src, task, mediaGenerationDisabled);
+  // Fork: a placeholder whose bytes went to the server pool resolves through
+  // that asset (lib/media/stage-media-assets.ts), so the image renders in any
+  // browser -- not only the one that generated it. The raw stored map is
+  // selected (a stable reference); only the loaded course's map counts.
+  const mediaAssets = useStageStore((state) =>
+    stageId && state.stage?.id === stageId
+      ? (state.stage as { mediaAssets?: unknown }).mediaAssets
+      : undefined,
+  );
+  const resolution = useResolvedMediaRef(
+    mediaRefForPlaceholder(elementInfo.src, mediaAssets),
+    task,
+    mediaGenerationDisabled,
+  );
   return {
     resolvedSrc: renderableMediaUrl(resolution) ?? '',
     isPlaceholder: !!stageId && isGeneratedMediaPlaceholder(elementInfo.src),

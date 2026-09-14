@@ -12,6 +12,7 @@ import {
 import { createSelectors } from '@/lib/utils/create-selectors';
 import type { ResumeGate } from '@/lib/classroom/progressive-load-policy';
 import { notifyServerGenerationComplete } from '@/lib/classroom/generation-complete-mirror';
+import { withStageMediaAsset } from '@/lib/media/stage-media-assets';
 import type { ChatSession } from '@/lib/types/chat';
 import type { SceneOutline } from '@/lib/types/generation';
 import { createLogger } from '@/lib/logger';
@@ -374,6 +375,12 @@ interface StageState {
   setViewerAccess: (access: { isOwner: boolean }) => void;
   /** Fork: set by the stage-meta answer, reset to `unknown` when a classroom load starts. */
   setResumeGate: (gate: ResumeGate) => void;
+  /**
+   * Fork: record the pool asset a generated-media placeholder became
+   * (lib/media/stage-media-assets.ts). A result for a course no longer
+   * loaded is dropped.
+   */
+  setStageMediaAsset: (stageId: string, placeholder: string, ref: string) => void;
   setGenerationStatus: (status: 'idle' | 'generating' | 'paused' | 'completed' | 'error') => void;
   setCurrentGeneratingOrder: (order: number) => void;
   bumpGenerationEpoch: () => void;
@@ -804,6 +811,14 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
   },
 
   setResumeGate: (resumeGate) => set({ resumeGate }),
+
+  setStageMediaAsset: (stageId, placeholder, ref) => {
+    const stage = get().stage;
+    if (!stage || stage.id !== stageId) return;
+    set({ stage: withStageMediaAsset(stage, placeholder, ref) });
+    // Part of the stage document: rides the shared pending-change scheduler.
+    markPendingChanges(stage.id, { kind: 'stage' });
+  },
 
   setGenerationStatus: (generationStatus) => set({ generationStatus }),
 

@@ -381,6 +381,57 @@ Tests: `tests/classroom/progressive-load-policy.test.ts`,
 `tests/store/stage-generation-complete-mirror.test.ts` (red before the change),
 all in `fork-ci.yml`.
 
+### A course's generated media lives on the server
+
+Upstream's browser generation is local-first: generated slide images went to
+IndexedDB (`mediaFiles`) and narration to `audioFiles`, and the scene document
+kept only opaque ids (`gen_img_*`, `tts_s*_…`). With documents on the server
+here, a course opened in another browser -- or by a learner on a published
+course -- had its slides and no pictures or sound (found by the 2026-09-14
+audit).
+
+Upstream already has a server-side answer, and this follows it rather than
+inventing one. Its 1.0.0 release retired the asset-registry wiring for
+generated media (#1242: "media and materials follow the reference byte
+model"); its agent runtime writes media bytes into the course's classroom-media
+directory (`persistClassroomMediaBytes`, `lib/server/classroom-media-bytes.ts`)
+and stores the returned `/api/classroom-media/...` reference in the document.
+The only missing piece was a way in for the browser:
+
+- `POST /api/stages/[id]/media` (`app/api/stages/[id]/media/route.ts`),
+  owner-only, calls `persistClassroomMediaBytes` with the uploaded bytes --
+  only the types the classroom-media route serves, at most 32 MiB.
+- Narration: `generateAndStoreTTS` uploads the clip and uses the served
+  reference as the action's `audioId`, and `generateTTSForScene` puts it on the
+  legacy `audioUrl` too -- the exact shape the agent runtime's scene TTS
+  stamps. `AudioPlayer` plays an `audioId` that is itself a served reference
+  when this browser has no bytes, so a regenerated line plays too.
+- Images: the orchestrator uploads the bytes in the background and the stage
+  records `placeholder -> reference` in `mediaAssets`
+  (`lib/media/stage-media-assets.ts`, beside `videoManifest`; the DSL validator
+  ignores unknown stage fields, so no schema change). The image renderer maps a
+  recorded placeholder to its reference, which renders as a concrete URL.
+- Both uploads are best-effort (`lib/media/persist-generated-media.ts`): a
+  failure -- not the owner, offline, no server persistence -- never fails
+  generation, and the IndexedDB copy stays what the generating browser plays.
+
+Published courses need nothing more: `/api/classroom-media` is upstream's
+serving route and has no per-reader check, so a learner who can open the course
+loads its media. That is also the privacy posture, stated plainly: the files of
+a private course are readable by anyone who has the exact URL. The URL is a
+content hash (`generated-<sha256>.<ext>`), unguessable, and appears only in the
+owner's documents. The bytes live on the studio's `/app/data` volume, which
+`deploy/backup-studio.sh` archives nightly.
+
+Generated video still uses the browser path; courses generated before this keep
+their media in the creating browser until the migration below uploads it.
+
+Tests: `tests/agent-runtime/stage-media-upload-route.test.ts`,
+`tests/media/persist-generated-media.test.ts`,
+`tests/audio/audio-player-server-audio-id.test.ts`,
+`tests/media/stage-media-assets.test.ts`,
+`tests/store/stage-media-assets-store.test.ts` (red before the change).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,
