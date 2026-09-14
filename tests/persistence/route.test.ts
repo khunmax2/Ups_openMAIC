@@ -6,6 +6,9 @@ describe('embedded persistence route', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
+    // The /kv test replaces these; nothing after it may inherit that.
+    vi.doUnmock('@/lib/persistence/server-provider');
+    vi.doUnmock('@/lib/persistence/account-kv');
     vi.stubEnv('ASSET_S3_BUCKET', '');
     vi.doMock('@/lib/persistence/stage-meta', () => ({
       ensureStageMetaSchema: vi.fn().mockResolvedValue(undefined),
@@ -76,6 +79,52 @@ describe('embedded persistence route', () => {
     const { GET } = await import('@/app/api/persistence/[...path]/route');
 
     const response = await GET(new Request('http://localhost/api/persistence/whoami'));
+
+    expect(response.status).toBe(401);
+  });
+
+  it("hands /kv paths to the account store, for the gateway's owner", async () => {
+    // Fork. Upstream's persistence handler has no KV routes; settings and the
+    // profile ride this one (lib/persistence/account-kv.ts).
+    vi.stubEnv('DATABASE_URL', 'postgres://unused-in-this-test');
+    vi.stubEnv('STUDIO_REQUIRE_GATEWAY', '1');
+    const pool = { query: vi.fn() };
+    const handleAccountKvRequest = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.doMock('@/lib/persistence/server-provider', () => ({
+      getServerPersistenceProvider: vi.fn(async () => ({ pool })),
+    }));
+    vi.doMock('@/lib/persistence/account-kv', () => ({ handleAccountKvRequest }));
+    const { PUT } = await import('@/app/api/persistence/[...path]/route');
+
+    const response = await PUT(
+      new Request('http://localhost/api/persistence/kv/entries/settings-storage', {
+        method: 'PUT',
+        headers: { 'x-deeptutor-owner': 'user:alice', 'content-type': 'application/json' },
+        body: JSON.stringify({ value: 1 }),
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(handleAccountKvRequest).toHaveBeenCalledOnce();
+    const [, path, ownerId, passedPool] = handleAccountKvRequest.mock.calls[0] as unknown as [
+      Request,
+      string,
+      string,
+      unknown,
+    ];
+    expect(path).toBe('/kv/entries/settings-storage');
+    expect(ownerId).toBe('user:alice');
+    expect(passedPool).toBe(pool);
+  });
+
+  it('refuses /kv like every other path when the gateway said nothing', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://unused-in-this-test');
+    vi.stubEnv('STUDIO_REQUIRE_GATEWAY', '1');
+    const { GET } = await import('@/app/api/persistence/[...path]/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/persistence/kv/entries/settings-storage'),
+    );
 
     expect(response.status).toBe(401);
   });
@@ -1114,6 +1163,9 @@ describe('embedded persistence route -- real handler boundary', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
+    // The /kv test replaces these; nothing after it may inherit that.
+    vi.doUnmock('@/lib/persistence/server-provider');
+    vi.doUnmock('@/lib/persistence/account-kv');
     vi.stubEnv('ASSET_S3_BUCKET', '');
   });
 

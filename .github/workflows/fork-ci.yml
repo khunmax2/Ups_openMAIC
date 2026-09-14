@@ -85,3 +85,4 @@ jobs:
           tests/audio/custom-tts-voice.test.ts
           tests/store/settings-custom-tts-voice.test.ts
           tests/audio/custom-tts-endpoint.test.ts
+          tests/store/account-kv.test.ts

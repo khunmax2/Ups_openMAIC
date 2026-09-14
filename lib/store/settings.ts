@@ -41,6 +41,7 @@ import {
   isLLMProviderConfigured,
 } from '@/lib/store/settings-validation';
 import { createKVPersistStorage, purgeLegacyPersistKey } from '@/lib/store/kv-persist';
+import { keysStayOutOfPersistedSettings } from '@/lib/store/account-kv';
 import { isTTSProviderEnabled } from '@/lib/audio/provider-enablement';
 import { apiPath } from '@/lib/base-path';
 
@@ -2022,8 +2023,11 @@ export const useSettingsStore = create<SettingsState>()(
       // keystroke and the server confirming it, and that moment must not be
       // written to the browser. The sentinel is written in its place; the
       // sync module sends the real value and replaces it in memory too.
+      // Fork, again: when the account scope is served by the server the blob
+      // itself leaves the browser, so keys are masked whatever the credential
+      // sync has reported (lib/store/account-kv.ts).
       partialize: (state) => {
-        if (state.credentialStorage !== 'server') return state;
+        if (!keysStayOutOfPersistedSettings(state.credentialStorage)) return state;
         const masked: Record<string, unknown> = { ...state };
         for (const key of [
           'providersConfig',
