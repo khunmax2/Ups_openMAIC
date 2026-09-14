@@ -1144,6 +1144,23 @@ export function getParallelSceneConcurrency(): number {
 }
 
 /**
+ * Fork. How many generated images/videos one course requests at once
+ * (`MEDIA_GENERATION_CONCURRENCY`), clamped to [1, 6], default 2.
+ *
+ * Upstream generated them strictly one after another, so a long course's last
+ * picture arrived minutes after its slides. Server-side for the same reason as
+ * {@link getParallelSceneConcurrency}: the right number depends on the image
+ * backend -- one self-hosted GPU wants few, a hosted API with a generous quota
+ * takes more -- and a burst above a key's quota surfaces as 429s. `1` restores
+ * upstream's order exactly.
+ */
+export function getMediaGenerationConcurrency(): number {
+  const raw = Number.parseInt(process.env.MEDIA_GENERATION_CONCURRENCY ?? '', 10);
+  if (!Number.isFinite(raw)) return 2;
+  return Math.min(Math.max(raw, 1), 6);
+}
+
+/**
  * Resolve the TTS voice, mirroring {@link resolveTTSModel}.
  *
  * When the server entry declares voices, they are what the engine actually has:

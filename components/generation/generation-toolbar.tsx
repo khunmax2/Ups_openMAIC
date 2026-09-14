@@ -887,6 +887,11 @@ function ModelSettingsPopover({
               ) : (
                 <Bot className="size-3.5 shrink-0" />
               )}
+              {/* Fork: the model itself, not only its provider's icon -- two
+                  models of one provider looked identical until hovered. */}
+              <span className="min-w-0 max-w-[7rem] truncate sm:max-w-[12rem]">
+                {currentModelLabel}
+              </span>
               {currentThinkingLabel && (
                 <span className="shrink-0 rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-violet-700 ring-1 ring-violet-200/70 dark:bg-violet-950/50 dark:text-violet-200 dark:ring-violet-800/70">
                   {currentThinkingLabel}

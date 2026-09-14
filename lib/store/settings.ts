@@ -240,6 +240,10 @@ export interface SettingsState {
   // 0 = off (serial generation); populated by fetchServerProviders.
   parallelSceneConcurrency: number;
 
+  // Fork: server-configured number of generated images/videos requested at
+  // once (MEDIA_GENERATION_CONCURRENCY); 1 until fetchServerProviders reports it.
+  mediaGenerationConcurrency: number;
+
   // Auto-config lifecycle flag (persisted)
   autoConfigApplied: boolean;
 
@@ -984,6 +988,9 @@ export const useSettingsStore = create<SettingsState>()(
         // Off until the server reports a concurrency via fetchServerProviders.
         parallelSceneConcurrency: 0,
 
+        // One at a time (upstream) until the server reports its number.
+        mediaGenerationConcurrency: 1,
+
         autoConfigApplied: false,
 
         // Web Search settings (use defaults)
@@ -1498,7 +1505,10 @@ export const useSettingsStore = create<SettingsState>()(
               image: Record<string, { models?: string[]; disabled?: boolean }>;
               video: Record<string, { models?: string[]; disabled?: boolean }>;
               webSearch: Record<string, { disabled?: boolean }>;
-              generation?: { parallelSceneConcurrency?: number };
+              generation?: {
+                parallelSceneConcurrency?: number;
+                mediaGenerationConcurrency?: number;
+              };
             };
 
             set((state) => {
@@ -1937,6 +1947,11 @@ export const useSettingsStore = create<SettingsState>()(
                 parallelSceneConcurrency: Math.max(
                   0,
                   Math.floor(data.generation?.parallelSceneConcurrency ?? 0),
+                ),
+                // Fork: an older server that does not report it keeps serial media.
+                mediaGenerationConcurrency: Math.max(
+                  1,
+                  Math.floor(data.generation?.mediaGenerationConcurrency ?? 1),
                 ),
                 autoConfigApplied: true,
                 // Validated selections
