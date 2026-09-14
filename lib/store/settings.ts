@@ -117,6 +117,8 @@ export interface SettingsState {
       customVoices?: Array<{ id: string; name: string }>;
       isBuiltIn?: boolean;
       requiresApiKey?: boolean;
+      /** Fork: built from an admin's share (lib/credentials/client.ts); goes when the share does. */
+      fromShare?: boolean;
     }
   >;
 
@@ -137,6 +139,8 @@ export interface SettingsState {
       customDefaultBaseUrl?: string;
       isBuiltIn?: boolean;
       requiresApiKey?: boolean;
+      /** Fork: built from an admin's share (lib/credentials/client.ts); goes when the share does. */
+      fromShare?: boolean;
     }
   >;
 
@@ -221,7 +225,10 @@ export interface SettingsState {
   credentialRole: 'admin' | 'user';
   credentialMeta: Record<string, { masked: string; baseUrl: string; source: 'own' | 'default' }>;
   /** The default rows alone, so an admin can see whether their own key already is one. */
-  credentialDefaults: Record<string, { masked: string; baseUrl: string }>;
+  credentialDefaults: Record<
+    string,
+    { masked: string; baseUrl: string; profile?: Record<string, unknown> }
+  >;
 
   // Global TTS/ASR toggles
   ttsEnabled: boolean;

@@ -31,6 +31,7 @@ import {
   type CredentialScope,
   type CredentialSection,
   type CredentialSet,
+  type ProviderProfile,
   type StoredCredential,
 } from './store';
 
@@ -56,6 +57,7 @@ function ownerOf(request: Request): string | Response {
 export interface MaskedCredential {
   masked: string;
   baseUrl: string;
+  profile?: ProviderProfile;
 }
 
 export type MaskedSet = Partial<Record<CredentialSection, Record<string, MaskedCredential>>>;
@@ -68,7 +70,11 @@ function maskSet(rows: CredentialSet['own'] | CredentialSet['defaults']): Masked
     out[section] = Object.fromEntries(
       Object.entries(providers).map(([id, row]) => [
         id,
-        { masked: maskCredential(row.apiKey), baseUrl: row.baseUrl },
+        {
+          masked: maskCredential(row.apiKey),
+          baseUrl: row.baseUrl,
+          ...(row.profile ? { profile: row.profile } : {}),
+        },
       ]),
     );
   }
@@ -120,6 +126,25 @@ function parseAddress(segments: string[]): Address | Response {
 
 type Patch = Partial<StoredCredential> & { copyFromOwner?: boolean };
 
+// Fork. A profile describes a provider (see ProviderProfile in ./store) so
+// another account's browser can show one it never added. It is not a
+// credential and must not become a second place to keep one.
+const MAX_PROFILE = 64 * 1024;
+const SECRET_FIELD = /^(api_?key|access_?key(_?id|_?secret)?)$|secret|token|password/iu;
+
+function readProfile(value: unknown): ProviderProfile | Response {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return jsonError(400, 'INVALID_REQUEST', 'profile must be an object');
+  }
+  const profile = Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(([field]) => !SECRET_FIELD.test(field)),
+  );
+  if (JSON.stringify(profile).length > MAX_PROFILE) {
+    return jsonError(400, 'INVALID_REQUEST', 'profile is too large');
+  }
+  return profile;
+}
+
 async function readPatch(request: Request): Promise<Patch | Response> {
   let body: unknown;
   try {
@@ -141,6 +166,12 @@ async function readPatch(request: Request): Promise<Patch | Response> {
       return jsonError(400, 'INVALID_REQUEST', `${field} must be a string`);
     }
     patch[field] = value.trim();
+  }
+  const profile = (body as Record<string, unknown>).profile;
+  if (profile !== undefined) {
+    const checked = readProfile(profile);
+    if (checked instanceof Response) return checked;
+    patch.profile = checked;
   }
   if (patch.apiKey === '***') {
     // The sentinel is what the browser sends when it does not hold a key; it
@@ -175,6 +206,10 @@ export async function handleWrite(request: Request, segments: string[]): Promise
   }
   const patch = await readPatch(request);
   if (patch instanceof Response) return patch;
+  if (patch.profile && address.scope !== 'default') {
+    // Only a shared row reaches a browser that lacks the provider.
+    return jsonError(400, 'INVALID_REQUEST', 'a profile belongs to a shared default');
+  }
   if (patch.copyFromOwner) {
     if (address.scope !== 'default') {
       return jsonError(400, 'INVALID_REQUEST', 'copyFromOwner applies to the default scope');

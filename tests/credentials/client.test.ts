@@ -21,7 +21,10 @@ function fakeServer(list: {
   storage?: 'server' | 'none';
   role?: 'admin' | 'user';
   own?: Record<string, Record<string, { masked: string; baseUrl: string }>>;
-  defaults?: Record<string, Record<string, { masked: string; baseUrl: string }>>;
+  defaults?: Record<
+    string,
+    Record<string, { masked: string; baseUrl: string; profile?: Record<string, unknown> }>
+  >;
 }) {
   const calls: Call[] = [];
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
@@ -302,5 +305,149 @@ describe('server-side credentials, browser half', () => {
       baseUrl: 'http://tts.internal/v1',
     });
     expect(s.credentialMeta['tts:custom-tts-mine']?.baseUrl).toBe('http://tts.internal/v1');
+  });
+
+  // Fork. A custom provider lives in the browser that added it. Found
+  // 2026-09-14: an admin shared a custom TTS and a promoted admin never saw it
+  // -- the shared row held a key and a URL for a provider id that account's
+  // browser had no entry for. The definition now travels with the share.
+  const sharedTTS = {
+    masked: 'sk••••',
+    baseUrl: 'http://tts.internal/v1',
+    profile: {
+      customName: 'Office TTS',
+      customDefaultBaseUrl: 'http://tts.internal/v1',
+      requiresApiKey: true,
+      modelId: 'tts-1',
+      customVoices: [{ id: 'nova', name: 'Nova' }],
+    },
+  };
+
+  it('brings in a custom provider an admin shared, and removes it when the share goes', async () => {
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    fakeServer({ defaults: { tts: { 'custom-tts-shared': sharedTTS } } });
+    const mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+
+    expect(useSettingsStore.getState().ttsProvidersConfig['custom-tts-shared']).toMatchObject({
+      apiKey: '***',
+      baseUrl: 'http://tts.internal/v1',
+      enabled: true,
+      customName: 'Office TTS',
+      modelId: 'tts-1',
+      customVoices: [{ id: 'nova', name: 'Nova' }],
+    });
+
+    fakeServer({});
+    await mod.refreshCredentials();
+    expect(useSettingsStore.getState().ttsProvidersConfig['custom-tts-shared']).toBeUndefined();
+  });
+
+  it('fills the model list of a shared provider the account never configured', async () => {
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    const models = [{ id: 'qwen-image-2512', name: 'qwen-image-2512' }];
+    fakeServer({
+      defaults: {
+        image: {
+          'custom-image': {
+            masked: 'sk••••',
+            baseUrl: 'https://gpu/v1',
+            profile: { customModels: models },
+          },
+        },
+      },
+    });
+    const mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+    expect(useSettingsStore.getState().imageProvidersConfig['custom-image']?.customModels).toEqual(
+      models,
+    );
+  });
+
+  it("sends the provider's profile, never a key, when an admin shares", async () => {
+    const { calls } = fakeServer({
+      role: 'admin',
+      own: { tts: { 'custom-tts-mine': { masked: 'th••••', baseUrl: 'http://tts.internal/v1' } } },
+    });
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    useSettingsStore
+      .getState()
+      .addCustomTTSProvider('custom-tts-mine', 'MyTTS', 'http://tts.internal/v1', true, 'tts-1');
+    const mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+
+    await mod.shareCredential('tts', 'custom-tts-mine');
+    const put = calls.find(
+      (c) =>
+        c.method === 'PUT' && c.url.includes('/api/studio/credentials/default/tts/custom-tts-mine'),
+    );
+    expect(put?.body).toEqual({
+      copyFromOwner: true,
+      profile: {
+        customName: 'MyTTS',
+        customDefaultBaseUrl: 'http://tts.internal/v1',
+        requiresApiKey: true,
+        modelId: 'tts-1',
+        customVoices: [],
+        isBuiltIn: false,
+      },
+    });
+  });
+
+  it('fills in the profile, once, for a default the admin shared before profiles travelled', async () => {
+    const row = { masked: 'th••••', baseUrl: 'http://tts.internal/v1' };
+    const own = { tts: { 'custom-tts-mine': row } };
+    const defaults = { tts: { 'custom-tts-mine': row } };
+    const { useSettingsStore } = await import('@/lib/store/settings');
+    useSettingsStore
+      .getState()
+      .addCustomTTSProvider('custom-tts-mine', 'MyTTS', 'http://tts.internal/v1', true, 'tts-1');
+
+    // An ordinary account never writes a default, whatever its browser holds.
+    const asUser = fakeServer({ role: 'user', own, defaults });
+    let mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+    expect(asUser.calls.filter((c) => c.method === 'PUT')).toHaveLength(0);
+
+    // The admin who shared it -- their own row is the shared one -- does.
+    const asAdmin = fakeServer({ role: 'admin', own, defaults });
+    mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+    const puts = asAdmin.calls.filter((c) => c.method === 'PUT');
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.url).toContain('/api/studio/credentials/default/tts/custom-tts-mine');
+    expect(puts[0]?.body).toEqual({
+      profile: {
+        customName: 'MyTTS',
+        customDefaultBaseUrl: 'http://tts.internal/v1',
+        requiresApiKey: true,
+        modelId: 'tts-1',
+        customVoices: [],
+        isBuiltIn: false,
+      },
+    });
+  });
+
+  // Applying what the server said changes base URLs in the store; the watcher
+  // must not mistake that for the person typing and write an own URL-only row
+  // that would then shadow the shared key.
+  it("does not write back what it was told when it applies the server's answer", async () => {
+    vi.useFakeTimers();
+    fakeServer({});
+    const mod = await import('@/lib/credentials/client');
+    mod.resetCredentialSyncForTests();
+    await mod.startCredentialSync();
+
+    const { calls } = fakeServer({
+      defaults: { image: { 'openai-image': { masked: 'sk••••', baseUrl: 'https://gpu/v1' } } },
+    });
+    await mod.refreshCredentials();
+    await vi.advanceTimersByTimeAsync(900);
+    expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(0);
   });
 });

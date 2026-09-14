@@ -70,3 +70,5 @@ jobs:
           tests/agent-runtime/studio-identity.test.ts
           tests/audio/wav-utils.test.ts
           tests/audio/custom-asr.test.ts
+          tests/server/credentials.test.ts
+          tests/credentials/client.test.ts

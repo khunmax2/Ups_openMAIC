@@ -32,9 +32,20 @@ export type CredentialSection = (typeof CREDENTIAL_SECTIONS)[number];
 
 export type CredentialScope = 'owner' | 'default';
 
+/**
+ * Fork. What a browser needs to show a provider it never added: a custom
+ * provider's name, endpoint, voices and models, or the model list an admin
+ * added to a built-in one. A custom provider otherwise exists only in the
+ * browser that created it, so a shared key for it reached every account and
+ * showed up in none. Set on default rows only; never a key (the route drops
+ * anything that looks like one). Stored as JSON text in the `profile` column.
+ */
+export type ProviderProfile = Record<string, unknown>;
+
 export interface StoredCredential {
   apiKey: string;
   baseUrl: string;
+  profile?: ProviderProfile;
 }
 
 /** Everything one request may need: the caller's own rows and the defaults. */
@@ -58,6 +69,7 @@ CREATE TABLE IF NOT EXISTS studio_credential (
   PRIMARY KEY (scope, owner_id, section, provider_id)
 );
 CREATE INDEX IF NOT EXISTS studio_credential_owner_idx ON studio_credential (owner_id);
+ALTER TABLE studio_credential ADD COLUMN IF NOT EXISTS profile TEXT NOT NULL DEFAULT '';
 `;
 
 export async function ensureCredentialSchema(queryable: Queryable): Promise<void> {
@@ -88,6 +100,19 @@ interface Row extends Record<string, unknown> {
   provider_id: string;
   api_key: string;
   base_url: string;
+  profile?: string;
+}
+
+function parseProfile(text: string | undefined): ProviderProfile | undefined {
+  if (!text) return undefined;
+  try {
+    const value: unknown = JSON.parse(text);
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as ProviderProfile)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function fold(rows: Row[], ownerId: string): CredentialSet {
@@ -101,9 +126,11 @@ function fold(rows: Row[], ownerId: string): CredentialSet {
           ? set.own
           : null;
     if (!bucket) continue;
+    const profile = parseProfile(row.profile);
     (bucket[row.section] ??= {})[row.provider_id] = {
       apiKey: row.api_key,
       baseUrl: row.base_url,
+      ...(profile ? { profile } : {}),
     };
   }
   return set;
@@ -115,7 +142,7 @@ export async function listCredentials(
   ownerId: string,
 ): Promise<CredentialSet> {
   const result = await queryable.query<Row>(
-    `SELECT scope, owner_id, section, provider_id, api_key, base_url
+    `SELECT scope, owner_id, section, provider_id, api_key, base_url, profile
        FROM studio_credential
       WHERE (scope = 'owner' AND owner_id = $1) OR scope = 'default'`,
     [ownerId],
@@ -146,19 +173,22 @@ export async function upsertCredential(
   patch: Partial<StoredCredential>,
 ): Promise<StoredCredential | null> {
   const existing = await readCredential(queryable, address);
+  // A key or URL edit that says nothing about the profile keeps it.
+  const profile = patch.profile ?? existing?.profile;
   const next: StoredCredential = {
     apiKey: patch.apiKey ?? existing?.apiKey ?? '',
     baseUrl: patch.baseUrl ?? existing?.baseUrl ?? '',
+    ...(profile ? { profile } : {}),
   };
   if (!next.apiKey && !next.baseUrl) {
     await deleteCredential(queryable, address);
     return null;
   }
   await queryable.query(
-    `INSERT INTO studio_credential (scope, owner_id, section, provider_id, api_key, base_url, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO studio_credential (scope, owner_id, section, provider_id, api_key, base_url, profile, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (scope, owner_id, section, provider_id)
-     DO UPDATE SET api_key = EXCLUDED.api_key, base_url = EXCLUDED.base_url, updated_at = EXCLUDED.updated_at`,
+     DO UPDATE SET api_key = EXCLUDED.api_key, base_url = EXCLUDED.base_url, profile = EXCLUDED.profile, updated_at = EXCLUDED.updated_at`,
     [
       address.scope,
       ownerColumn(address),
@@ -166,6 +196,7 @@ export async function upsertCredential(
       address.providerId,
       next.apiKey,
       next.baseUrl,
+      profile ? JSON.stringify(profile) : '',
       Date.now(),
     ],
   );
@@ -177,13 +208,15 @@ export async function readCredential(
   address: CredentialAddress,
 ): Promise<StoredCredential | null> {
   const result = await queryable.query<Row>(
-    `SELECT scope, owner_id, section, provider_id, api_key, base_url
+    `SELECT scope, owner_id, section, provider_id, api_key, base_url, profile
        FROM studio_credential
       WHERE scope = $1 AND owner_id = $2 AND section = $3 AND provider_id = $4`,
     [address.scope, ownerColumn(address), address.section, address.providerId],
   );
   const row = result.rows[0];
-  return row ? { apiKey: row.api_key, baseUrl: row.base_url } : null;
+  if (!row) return null;
+  const profile = parseProfile(row.profile);
+  return { apiKey: row.api_key, baseUrl: row.base_url, ...(profile ? { profile } : {}) };
 }
 
 export async function deleteCredential(
