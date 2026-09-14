@@ -70,6 +70,20 @@ export function maskApiKeys<T>(value: T): T {
   return masked as T;
 }
 
+/**
+ * The JSON form of `value` -- exactly what upstream's browser store kept, since
+ * it stored `JSON.stringify(value)`. zustand's `persist` hands its storage the
+ * whole state, the store's actions and undefined fields included; the browser
+ * store dropped them without a word, while `HttpKVStore` refuses anything that
+ * is not exact JSON. So every settings write failed in the browser after the
+ * switch (deploy-2026-09-15b: "your changes were not saved") while reads, of an
+ * adopted copy that was already plain JSON, went on working.
+ */
+export function toJsonValue<T>(value: T): T {
+  const text = JSON.stringify(value);
+  return text === undefined ? (undefined as T) : (JSON.parse(text) as T);
+}
+
 /** Device-scope marker: this browser's copy of `key` already went to an account. */
 const adoptedMarker = (key: string) => `account-kv-adopted:${key}`;
 
@@ -95,7 +109,7 @@ export class SeededAccountKV implements DeviceSafeKVStore {
     try {
       // Masked on the way up; the store still gets the key, so the credential
       // sync can move it to where keys belong.
-      await this.remote.set(key, maskApiKeys(adopted));
+      await this.remote.set(key, maskApiKeys(toJsonValue(adopted)));
       await this.local.set(adoptedMarker(key), true, 'device');
     } catch {
       // Not recorded: the next write carries the value up anyway, and until
@@ -106,7 +120,7 @@ export class SeededAccountKV implements DeviceSafeKVStore {
 
   async set<T>(key: string, value: T, scope: KVScope = 'account'): Promise<void> {
     if (scope === 'device') return this.local.set(key, value, 'device');
-    return this.remote.set(key, maskApiKeys(value));
+    return this.remote.set(key, maskApiKeys(toJsonValue(value)));
   }
 
   async remove(key: string, scope: KVScope = 'account'): Promise<void> {
