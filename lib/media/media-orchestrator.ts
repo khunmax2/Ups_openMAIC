@@ -16,6 +16,7 @@ import { createLogger } from '@/lib/logger';
 import { apiPath } from '@/lib/base-path';
 import { uploadGeneratedMedia } from '@/lib/media/persist-generated-media';
 import { mapWithConcurrency } from '@/lib/utils/concurrency';
+import { readStageMediaAssets } from '@/lib/media/stage-media-assets';
 
 const log = createLogger('MediaOrchestrator');
 
@@ -38,6 +39,24 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 /**
+ * Fork. The placeholders this course already has a served copy of
+ * (`stage.mediaAssets`). This browser's media tasks come from its own IndexedDB
+ * only, so without this the classroom's resume regenerated -- and replaced --
+ * every server-stored image whenever the owner opened the course in another
+ * browser. An image with no served copy is still generated, which is how an
+ * older course whose creating browser is gone gets its pictures back.
+ */
+async function servedCopies(stageId: string): Promise<ReadonlySet<string>> {
+  try {
+    const { useStageStore } = await import('@/lib/store/stage');
+    const stage = useStageStore.getState().stage;
+    return new Set(stage?.id === stageId ? Object.keys(readStageMediaAssets(stage)) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * Launch media generation for all mediaGenerations declared in outlines.
  * Runs in parallel with content/action generation — does not block.
  */
@@ -48,6 +67,7 @@ export async function generateMediaForOutlines(
 ): Promise<void> {
   const settings = useSettingsStore.getState();
   const store = useMediaGenerationStore.getState();
+  const served = await servedCopies(stageId);
 
   // Collect all media requests
   const allRequests: MediaGenerationRequest[] = [];
@@ -60,6 +80,8 @@ export async function generateMediaForOutlines(
       // Skip already completed or permanently failed (restored from DB)
       const existing = store.getTask(mg.elementId);
       if (existing?.status === 'done' || existing?.status === 'failed') continue;
+      // Fork: already stored on the server for this course.
+      if (served.has(mg.elementId)) continue;
       allRequests.push(mg);
     }
   }
