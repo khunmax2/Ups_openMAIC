@@ -450,13 +450,28 @@ through browser TTS when that is the selected provider), and the owner
 re-voices it from the edit timeline ("Voice all" per scene, or one line), which
 stores the new clip on the server.
 
+Every other reader that looked only in this browser's IndexedDB came up empty
+in another browser, too (found in the 2026-09-15 review): the home thumbnail
+(`getFirstSlideByStages`), the classroom ZIP, the PPTX export, the video export,
+and the edit timeline's "voiced" status and preview. They now reach the served
+copy when this browser holds none: images through the course's `mediaAssets`
+(`applyServedImageSources` for the thumbnail, a `servedCopies` level in
+`resolveStoredBytes` for the ZIP and PPTX, records built from the served bytes
+in the video export's `timeline-deps`), narration through
+`resolveAudioBlob(id, { fetchServed: true })`. Fetching a served clip is
+opt-in -- playback has its own fallback and the timeline's status check treats
+a served id as voiced without downloading it -- and a served copy is accepted
+only as a 200 with bytes, even where an export is otherwise lax.
+
 Tests: `tests/agent-runtime/stage-media-upload-route.test.ts`,
 `tests/media/persist-generated-media.test.ts`,
 `tests/audio/audio-player-server-audio-id.test.ts`,
 `tests/media/stage-media-assets.test.ts`,
 `tests/store/stage-media-assets-store.test.ts`,
 `tests/media/migrate-stage-media.test.ts`,
-`tests/media/media-orchestrator-served-copies.test.ts` (red before the change).
+`tests/media/media-orchestrator-served-copies.test.ts`,
+`tests/media/served-copies.test.ts`,
+`tests/audio/regenerate-speech-tts-served.test.ts` (red before the change).
 
 ### A custom TTS provider is only sent a voice it lists
 

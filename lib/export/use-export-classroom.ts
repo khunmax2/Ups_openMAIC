@@ -27,6 +27,7 @@ import {
 } from './classroom-zip-utils';
 import { createLogger } from '@/lib/logger';
 import { buildStageAssetManifest } from '@/lib/media/asset-manifest';
+import { readStageMediaAssets } from '@/lib/media/stage-media-assets';
 import {
   inlineHtmlAssets,
   createAssetFetcher,
@@ -117,7 +118,7 @@ export async function buildClassroomExportZip(
 
     // 5. Collect referenced audio and generated media.
     const audioFiles = await collectAudioFiles(audioEntries);
-    const mediaFiles = await collectMediaFiles(stage.id, mediaEntries);
+    const mediaFiles = await collectMediaFiles(stage.id, mediaEntries, readStageMediaAssets(stage));
 
     // 6. Build audioId → zipPath mapping for manifest
     const audioIdToPath = new Map<string, string>();

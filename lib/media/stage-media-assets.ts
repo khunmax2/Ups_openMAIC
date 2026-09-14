@@ -72,3 +72,41 @@ export function withSpeechAudioRef(scene: Scene, fromId: string, ref: string): S
     ),
   };
 }
+
+/**
+ * True for a reference the server serves: an app path (`/api/classroom-media/...`)
+ * or an absolute URL, as opposed to an opaque id (`gen_img_*`, `tts_s*_*`) whose
+ * bytes can only be in some browser.
+ */
+export function isServedMediaReference(ref: string | undefined): ref is string {
+  return !!ref && (ref.startsWith('/') || /^https?:\/\//iu.test(ref));
+}
+
+/** The bytes behind a served reference, or null when it cannot be fetched. Never throws. */
+export async function fetchServedBytes(url: string): Promise<Blob | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return blob.size > 0 ? blob : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Point the image elements of `slide` whose placeholder the course recorded at
+ * their served copies. Mutates `slide`: pass a copy. For readers that resolve
+ * a slide outside the renderer (the home thumbnail), which otherwise found the
+ * placeholder's bytes only in the browser that generated them.
+ */
+export function applyServedImageSources(
+  slide: { readonly elements: ReadonlyArray<{ readonly type: string }> },
+  assets: StageMediaAssets,
+): void {
+  for (const element of slide.elements as ReadonlyArray<{ type: string; src?: unknown }>) {
+    if (element.type !== 'image' || typeof element.src !== 'string') continue;
+    const served = Object.hasOwn(assets, element.src) ? assets[element.src] : undefined;
+    if (served) element.src = served;
+  }
+}

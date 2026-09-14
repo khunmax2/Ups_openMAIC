@@ -46,6 +46,7 @@ import {
 import { useMediaGenerationStore } from '@/lib/store/media-generation';
 import { resolveVideoMediaForElement } from '@/lib/media/media-task-resolution';
 import { resolveAudioBlob } from '@/lib/media/resolve-audio-bytes';
+import { fetchServedBytes, readStageMediaAssets } from '@/lib/media/stage-media-assets';
 import { fetchMediaUrl } from '@/lib/media/fetch-media-url';
 
 /** Loaded source records, keyed for both metadata (compiler) and byte collection. */
@@ -263,7 +264,8 @@ export async function createVideoTimelineDeps(input: {
     // own blob is the resolver's legacy fallback. The row read here supplies
     // duration/format/ossKey metadata for the compiler's sync lookups.
     const record = await db.audioFiles.get(audioId);
-    const blob = await resolveAudioBlob(audioId);
+    // Fork: a clip stored on the server is fetched when this browser holds none.
+    const blob = await resolveAudioBlob(audioId, { fetchServed: true });
     if (blob)
       audioById.set(
         audioId,
@@ -325,6 +327,28 @@ export async function createVideoTimelineDeps(input: {
       .get(mediaFileKey(stage.id, entry.ref))
       .catch(() => undefined);
     if (record) mediaByElementId.set(entry.ref, record);
+  }
+  // Fork: an image this browser never held is still the course's, on the
+  // server (`stage.mediaAssets`). Load it as a record, so the rendered frame
+  // and the asset entry both find it. Video is not stored there.
+  const servedCopies = readStageMediaAssets(stage as Stage);
+  for (const entry of assetManifest.entries) {
+    if (entry.kind === 'audio' || mediaByElementId.has(entry.ref)) continue;
+    const served = Object.hasOwn(servedCopies, entry.ref) ? servedCopies[entry.ref] : undefined;
+    if (!served) continue;
+    const blob = await fetchServedBytes(served);
+    if (!blob) continue;
+    mediaByElementId.set(entry.ref, {
+      id: mediaFileKey(stage.id, entry.ref),
+      stageId: stage.id,
+      type: blob.type.startsWith('video/') ? 'video' : 'image',
+      blob,
+      mimeType: blob.type || 'image/png',
+      size: blob.size,
+      prompt: '',
+      params: '',
+      createdAt: 0,
+    });
   }
 
   // Bridge slide element `.id` → media ref, so a `play_video`/media lookup by the

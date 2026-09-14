@@ -51,6 +51,7 @@ import {
   type MediaTaskState,
 } from '@/lib/media/resolve-media-ref';
 import { withAssetUrl } from '@/lib/media/use-asset-url';
+import { applyServedImageSources, readStageMediaAssets } from '@/lib/media/stage-media-assets';
 import { useSettingsStore } from '@/lib/store/settings';
 import {
   beginStageDeletionCascade,
@@ -909,6 +910,9 @@ export async function getFirstSlideByStages(
         const firstSlide = document?.scenes.find((s) => s.content?.type === 'slide');
         if (firstSlide && firstSlide.content.type === 'slide') {
           const slide = structuredClone(firstSlide.content.canvas);
+          // Fork: a generated image the course keeps on the server shows in
+          // any browser, not only the one that made it.
+          applyServedImageSources(slide, readStageMediaAssets(document?.stage));
 
           const mediaSlots = [...slideMediaReferenceSlots(slide)];
           const mediaElements = new Set<ThumbnailMediaElement>();

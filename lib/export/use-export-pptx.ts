@@ -31,6 +31,7 @@ import type { FetchAsset } from './inline-assets';
 import { createProxiedFetch } from './proxied-fetch';
 import type { AssetUrlLeaseState } from '@/lib/media/use-asset-url';
 import { resolveStoredBytes } from '@/lib/media/resolve-stored-bytes';
+import { readStageMediaAssets, type StageMediaAssets } from '@/lib/media/stage-media-assets';
 import {
   MISSING_ASSET_LEASE,
   isConcreteMediaAddress,
@@ -411,6 +412,7 @@ async function resolvePptxEmbeddableSrc(
   ref: string | undefined,
   task: MediaTaskState | undefined,
   stageId?: string,
+  servedCopies?: StageMediaAssets,
 ): Promise<string> {
   if (!ref) return '';
   if (!isConcreteMediaAddress(ref)) {
@@ -420,6 +422,7 @@ async function resolvePptxEmbeddableSrc(
       loadCompatRow: true,
       taskUrlFallback: true,
       fetchPolicy: { requireOk: true, requireNonEmpty: false },
+      servedCopies,
     });
     if (stored) return blobToDataUrl(stored);
   }
@@ -502,6 +505,8 @@ export async function buildPptxBlob(
   ratioPx2Inch: number,
   ratioPx2Pt: number,
   stageId?: string,
+  /** Fork: the course's served copies, for an export from a browser that never held them. */
+  servedCopies?: StageMediaAssets,
 ): Promise<Blob> {
   const pptx = new pptxgen();
   const documentElements = slides.flatMap((slide) => slide.elements);
@@ -517,7 +522,7 @@ export async function buildPptxBlob(
     if (isPptxManifestForeignRef(ref, manifestRefs, task)) {
       throw new Error(`PPTX layout attempted to resolve a ref outside the asset manifest: ${ref}`);
     }
-    return resolvePptxEmbeddableSrc(ref, task, stageId);
+    return resolvePptxEmbeddableSrc(ref, task, stageId, servedCopies);
   };
 
   // Set layout based on aspect ratio
@@ -1353,6 +1358,7 @@ export function useExportPPTX() {
         ratioPx2Inch,
         ratioPx2Pt,
         stage?.id,
+        readStageMediaAssets(stage),
       );
       saveAs(blob, `${fileName}.pptx`);
       toast.success(t('export.exportSuccess'));
@@ -1393,6 +1399,7 @@ export function useExportPPTX() {
             ratioPx2Inch,
             ratioPx2Pt,
             stage?.id,
+            readStageMediaAssets(stage),
           ),
       });
 

@@ -9,6 +9,13 @@ import { fetchMediaUrl } from '@/lib/media/fetch-media-url';
 import { mapWithConcurrency } from '@/lib/utils/concurrency';
 import { resolveStoredBytes } from '@/lib/media/resolve-stored-bytes';
 import { canonicalArchiveMedia } from '@/lib/video-export/archive-media';
+import { isServedMediaReference, type StageMediaAssets } from '@/lib/media/stage-media-assets';
+
+/** The file suffix of a served reference (`…/tts-<sha>.wav` -> `wav`), if it has one. */
+function servedFileExtension(ref: string): string | undefined {
+  if (!isServedMediaReference(ref)) return undefined;
+  return /\.([a-z0-9]+)(?:[?#].*)?$/iu.exec(ref)?.[1];
+}
 
 // ─── Export: Collect Media ─────────────────────────────────────
 
@@ -150,12 +157,16 @@ export async function collectAudioFiles(
     // The pool answers first: after a stable-id regeneration whose mirror
     // write failed, the row holds the superseded narration. A ref whose bytes
     // resolve nowhere ships nothing; the caller marks it missing.
-    const blob = await resolveAudioBlob(audioId);
+    // Fork: a clip stored on the server is fetched when this browser holds no
+    // copy, so an export from any browser carries the narration.
+    const blob = await resolveAudioBlob(audioId, { fetchServed: true });
     // A row with no usable bytes -- an evicted row (empty blob, no pool
     // resolve) -- must not ship an empty audio file.
     if (!blob || blob.size === 0) continue;
     const record = await db.audioFiles.get(audioId);
-    const canonical = canonicalArchiveMedia('audio', { extension: record?.format });
+    const canonical = canonicalArchiveMedia('audio', {
+      extension: record?.format ?? servedFileExtension(audioId),
+    });
     const ext = canonical.extension;
     const resolved = (
       record ? { ...record, blob, format: ext } : { id: audioId, blob, format: ext }
@@ -188,6 +199,8 @@ export async function collectAudioFiles(
 export async function collectMediaFiles(
   stageId: string,
   entries: readonly AssetManifestEntry[],
+  /** Fork: the course's served copies, for an export from a browser that never held them. */
+  servedCopies?: StageMediaAssets,
 ): Promise<CollectedMedia[]> {
   const collected: CollectedMedia[] = [];
   for (const [index, entry] of entries.entries()) {
@@ -196,6 +209,7 @@ export async function collectMediaFiles(
     const blob = await resolveStoredBytes(ref, {
       record,
       fetchPolicy: { requireOk: false, requireNonEmpty: true },
+      servedCopies,
     });
     // Referenced but with bytes nowhere (pending generation, pruned, failed):
     // the archive simply lacks the file, as it did when no row existed.
