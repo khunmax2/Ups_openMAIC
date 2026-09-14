@@ -254,22 +254,33 @@ describe('PG-mode folder listing and creation', () => {
         url: '/api/folders/folder%2Fone?mode=ungroup',
         respond: () => jsonResponse(200, { ok: true }),
       },
+      // Fork: with server persistence on, the persisted stores read their
+      // account-scoped values over /api/persistence/kv (lib/store/account-kv.ts)
+      // when they load; a fresh server has none.
+      ...['settings-storage', 'user-profile-storage'].map((key) => ({
+        method: 'GET' as const,
+        url: `/api/persistence/kv/entries/${key}`,
+        respond: () =>
+          jsonResponse(404, { error: { code: 'KEY_NOT_FOUND', message: `no kv entry ${key}` } }),
+      })),
     ]);
 
     const { renameFolder, deleteFolder } = await import('@/lib/utils/stage-storage');
     await renameFolder('folder/one', 'Reading');
     await deleteFolder('folder/one', 'ungroup');
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
+    const folderCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).startsWith('/api/folders'),
+    );
+    expect(folderCalls).toHaveLength(2);
+    expect(folderCalls[0]).toEqual([
       '/api/folders/folder%2Fone',
       expect.objectContaining({ method: 'PATCH' }),
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    ]);
+    expect(folderCalls[1]).toEqual([
       '/api/folders/folder%2Fone?mode=ungroup',
       expect.objectContaining({ method: 'DELETE' }),
-    );
+    ]);
   });
 
   it('keeps the device-local Dexie listing when server persistence is off', async () => {
