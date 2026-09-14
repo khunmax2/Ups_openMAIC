@@ -32,7 +32,6 @@
  * The states and transitions are tabulated on {@link KeyState}.
  */
 import {
-  BrowserKVStore,
   kvPersistStorage,
   type DeviceSafeKVStore,
   type KVScope,
@@ -42,6 +41,7 @@ import {
 import type { PersistStorage, StorageValue } from 'zustand/middleware';
 
 import { createLogger } from '@/lib/logger';
+import { createAppKVStore } from '@/lib/store/account-kv';
 import { reportPersistHealth } from '@/lib/store/persist-health';
 
 const log = createLogger('KVPersist');
@@ -470,7 +470,10 @@ function ambientLocalStorage(): Storage | null {
 function resolveKv(deps: KVPersistDeps): KVStore | null {
   if (deps.kv) return deps.kv;
   if (!ambientLocalStorage()) return null;
-  return (defaultKv ??= new BrowserKVStore());
+  // Fork: the account scope goes to the server when this deployment persists
+  // there, per account (lib/store/account-kv.ts); otherwise upstream's browser
+  // store, exactly as before.
+  return (defaultKv ??= createAppKVStore());
 }
 
 /** True when a KV backend keeps its `device` scope on the machine. */

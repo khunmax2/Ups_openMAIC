@@ -8,6 +8,7 @@ import {
 } from '@openmaic/storage/server';
 
 import { validateAppScene, validateAppStage } from '@/lib/document-store/validators';
+import { handleAccountKvRequest } from '@/lib/persistence/account-kv';
 import { resolveAssetCollectionGraceMs } from '@/lib/persistence/asset-collection-grace';
 import {
   decideDocumentAccess,
@@ -295,6 +296,15 @@ export async function handlePersistenceRequest(
     }
     try {
       const path = routeRelativePath(request);
+      // Fork. Upstream's handler has no KV routes; the account scope
+      // (provider settings, the profile) is served here, per verified owner
+      // (lib/persistence/account-kv.ts).
+      if (path === '/kv' || path.startsWith('/kv/')) {
+        const { pool } = await getServerPersistenceProvider(connectionString, deps.poolFactory);
+        const response = await handleAccountKvRequest(request, path, ownerId, pool);
+        for (const [name, value] of responseHeaders.entries()) response.headers.append(name, value);
+        return response;
+      }
       const action = parseDocumentAction(request.method, path);
       let access: DocumentAccess = 'allow';
       if (path === '/documents' || path.startsWith('/documents/')) {

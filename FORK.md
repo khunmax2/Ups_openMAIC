@@ -471,6 +471,44 @@ Tests: `tests/audio/custom-tts-voice.test.ts`,
 `tests/store/settings-custom-tts-voice.test.ts`,
 `tests/audio/custom-tts-endpoint.test.ts` (red before the change).
 
+### Settings and the profile follow the account, not the browser
+
+Upstream persists provider settings (`settings-storage`: model lists,
+deletions, toggles, the selected voice) and the user profile
+(`user-profile-storage`: avatar, nickname, bio) through the KV store's
+`account` scope -- by its own definition the data "a server-backed deployment
+may sync across devices" -- and ships the client for that (`HttpKVStore`), but
+no server, and the app only ever built the browser store. So a new browser came
+up with upstream's defaults: deleted models back, added ones gone, image and TTS
+toggles off, voice `default`, blank profile (found by the 2026-09-14 audit).
+
+- Server: `lib/persistence/account-kv.ts` answers upstream's KV contract at
+  `/api/persistence/kv/...` (keys, get, put, delete), one row per (owner, key)
+  in `studio_account_kv`, created on first use. The persistence route hands it
+  `/kv` paths after the gateway identity is resolved, like `/whoami`; nothing on
+  the wire names a principal or a scope.
+- Client: `lib/store/account-kv.ts` is the backend `kv-persist` now builds.
+  With `NEXT_PUBLIC_PERSISTENCE=1` the `account` scope goes to that route
+  (`HttpKVStore`); `device` values stay in the browser as before; without it,
+  upstream's browser store exactly as before.
+- First load after the switch: the server has nothing yet and upstream's
+  persist seam never migrates, so an empty answer would hydrate defaults over
+  the user's settings. When the server has no value, this browser's copy is
+  adopted and sent up once; from then on the server's value is the one read. A
+  person who used two browsers gets whichever browser opens the studio first.
+  Deleting a value deletes the local copy too, so it is not adopted back.
+- Keys never travel in the blob: whenever the scope is server-backed the
+  settings are persisted with every API key masked, whatever the credential
+  sync has reported. Keys stay in `studio_credential`.
+- Values over 4 MiB are refused (a very large uploaded avatar would be); the
+  persist seam then reports the write as unsaved instead of dropping it
+  silently.
+
+Tests: `tests/persistence/account-kv.test.ts` (including upstream's own
+`HttpKVStore` round-tripping through the handler),
+`tests/store/account-kv.test.ts`, `tests/persistence/route.test.ts` (red before
+the change).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,
