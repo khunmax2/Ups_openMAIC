@@ -547,11 +547,21 @@ toggles off, voice `default`, blank profile (found by the 2026-09-14 audit).
 - Values over 4 MiB are refused (a very large uploaded avatar would be); the
   persist seam then reports the write as unsaved instead of dropping it
   silently.
+- Values go up as JSON. zustand's `persist` hands its storage the whole state
+  -- the store's actions and undefined fields included -- and upstream's
+  browser store dropped them silently through `JSON.stringify`, while
+  `HttpKVStore` refuses anything that is not exact JSON. After
+  deploy-2026-09-15b every settings change failed in the browser ("your changes
+  were not saved") while reads of the already-plain adopted copy worked.
+  `SeededAccountKV` now sends the JSON form, exactly what the browser store
+  kept. The earlier tests fed the KV plain objects; the new one drives a real
+  persisted store through the real client to the handler.
 
 Tests: `tests/persistence/account-kv.test.ts` (including upstream's own
 `HttpKVStore` round-tripping through the handler),
-`tests/store/account-kv.test.ts`, `tests/persistence/route.test.ts`, and the
-burst case in `tests/store/kv-persist.test.ts` (red before the change).
+`tests/store/account-kv.test.ts`, `tests/persistence/route.test.ts`, the
+burst case in `tests/store/kv-persist.test.ts`, and
+`tests/store/account-kv-persisted-store.test.ts` (red before the change).
 
 ### A course's images are generated a few at a time, and the pill names the model
 
