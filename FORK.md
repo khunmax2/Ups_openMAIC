@@ -444,6 +444,33 @@ Tests: `tests/agent-runtime/stage-media-upload-route.test.ts`,
 `tests/store/stage-media-assets-store.test.ts`,
 `tests/media/migrate-stage-media.test.ts` (red before the change).
 
+### A custom TTS provider is only sent a voice it lists
+
+The settings store's generic fallback voice is `default`. A built-in provider
+maps it to its own default; a custom server does not know it and answers 400.
+Found 2026-09-14 on a shared custom provider (see "A shared custom provider
+travels with its definition"): it was selected before its voice list arrived
+through the credential sync, the selection stayed `default`, and every
+narration request failed with "OpenAI TTS API error: Bad Request" until the
+user switched providers away and back -- only `setTTSProvider` picked a listed
+voice.
+
+- `lib/audio/custom-tts-voice.ts`: `customTTSVoiceFor` (the chosen voice when
+  the custom provider lists it, else its first listed voice) and
+  `correctedCustomTTSVoice`.
+- The settings store applies it after every change and once at load
+  (`useSettingsStore.subscribe`, bottom of `lib/store/settings.ts`), so no
+  write path -- sync, restored blob, direct `setState` -- can leave it out.
+- Narration requests apply it to a course's saved voice binding
+  (`generateAndStoreTTS`), which can hold `default` from before.
+- `generateOpenAITTS` names a custom provider's failure "Custom TTS API error"
+  and reads the reason the way the other OpenAI-compatible providers do
+  (`readTTSApiError`: FastAPI `detail`, then `error`).
+
+Tests: `tests/audio/custom-tts-voice.test.ts`,
+`tests/store/settings-custom-tts-voice.test.ts`,
+`tests/audio/custom-tts-endpoint.test.ts` (red before the change).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

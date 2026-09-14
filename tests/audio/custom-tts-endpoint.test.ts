@@ -53,4 +53,58 @@ describe('a custom TTS provider', () => {
       'http://tts.internal/v1/audio/speech',
     );
   });
+
+  // Found 2026-09-14: a custom server's refusal surfaced as "OpenAI TTS API
+  // error: Bad Request" -- the wrong vendor, and the server's reason (FastAPI's
+  // `detail`) dropped.
+  it("reports a refusal under its own name, with the server's reason", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Unknown voice 'default'" }), {
+            status: 400,
+            statusText: 'Bad Request',
+            headers: { 'content-type': 'application/json' },
+          }),
+      ),
+    );
+    const attempt = generateTTS(
+      {
+        providerId: CUSTOM,
+        modelId: 'tts-1',
+        voice: 'default',
+        apiKey: '',
+        baseUrl: 'http://tts.internal/v1',
+      },
+      'hello',
+    );
+    await expect(attempt).rejects.toThrow("Custom TTS API error: Unknown voice 'default'");
+  });
+});
+
+describe('OpenAI TTS', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("still reports OpenAI's own error message under OpenAI's name", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { message: 'Invalid voice' } }), {
+            status: 400,
+            statusText: 'Bad Request',
+            headers: { 'content-type': 'application/json' },
+          }),
+      ),
+    );
+    await expect(
+      generateTTS(
+        { providerId: 'openai-tts' as TTSProviderId, voice: 'nope', apiKey: 'sk-x' },
+        'hello',
+      ),
+    ).rejects.toThrow('OpenAI TTS API error: Invalid voice');
+  });
 });

@@ -26,6 +26,7 @@ import {
   type ResolvedVoice,
 } from '@/lib/audio/voice-resolver';
 import { resolveTTSModelForVoice } from '@/lib/audio/constants';
+import { customTTSVoiceFor } from '@/lib/audio/custom-tts-voice';
 import { useAgentRegistry } from '@/lib/orchestration/registry/store';
 import { generateMediaForOutlines } from '@/lib/media/media-orchestrator';
 import { lazyBoundedMap } from '@/lib/utils/concurrency';
@@ -334,7 +335,13 @@ export async function generateAndStoreTTS(
   }
 
   const ttsProviderId = resolvedVoice.providerId;
-  const ttsVoice = resolvedVoice.voiceId;
+  // Fork: a course's saved voice binding can still name a voice its custom
+  // provider does not list, e.g. `default` (lib/audio/custom-tts-voice.ts).
+  const ttsVoice = customTTSVoiceFor(
+    ttsProviderId,
+    resolvedVoice.voiceId,
+    settings.ttsProvidersConfig?.[ttsProviderId]?.customVoices,
+  );
   const ttsProviderConfig = settings.ttsProvidersConfig?.[ttsProviderId];
   const ttsModelId = resolveTTSModelForVoice(
     ttsProviderId,

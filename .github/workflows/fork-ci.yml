@@ -82,3 +82,6 @@ jobs:
           tests/agent-runtime/stage-media-upload-route.test.ts
           tests/audio/audio-player-server-audio-id.test.ts
           tests/media/migrate-stage-media.test.ts
+          tests/audio/custom-tts-voice.test.ts
+          tests/store/settings-custom-tts-voice.test.ts
+          tests/audio/custom-tts-endpoint.test.ts
