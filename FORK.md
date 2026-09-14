@@ -511,17 +511,32 @@ toggles off, voice `default`, blank profile (found by the 2026-09-14 audit).
   adopted and sent up once; from then on the server's value is the one read. A
   person who used two browsers gets whichever browser opens the studio first.
   Deleting a value deletes the local copy too, so it is not adopted back.
+  Settings used to belong to the browser, so accounts that shared one browser
+  shared one copy: it goes to the first account that opens the studio there
+  (a device-scope marker records it), and any other account starts from
+  defaults rather than carrying that mix-up into its own copy for good.
 - Keys never travel in the blob: whenever the scope is server-backed the
   settings are persisted with every API key masked, whatever the credential
-  sync has reported. Keys stay in `studio_credential`.
+  sync has reported, and `SeededAccountKV` masks every value it sends --
+  adopted copies included, which bypass the store's own masking. The store
+  still receives an adopted copy unmasked, so the credential sync can move a
+  key this browser held into `studio_credential`, where keys stay.
+- Writes: the persisted stores write the whole blob on every change, and the
+  chat panel's width changes on every pointer move. `kv-persist` now skips a
+  queued write that a newer one for the same key has superseded, so a drag is
+  one request, not one per stale snapshot.
+- A tab left open holds an old copy, and its next change would write that copy
+  over what another browser saved since; both stores re-read the server when
+  the tab becomes visible again (`rehydrateWhenVisible`). What remains is
+  last-write-wins between two tabs changing settings at the same time.
 - Values over 4 MiB are refused (a very large uploaded avatar would be); the
   persist seam then reports the write as unsaved instead of dropping it
   silently.
 
 Tests: `tests/persistence/account-kv.test.ts` (including upstream's own
 `HttpKVStore` round-tripping through the handler),
-`tests/store/account-kv.test.ts`, `tests/persistence/route.test.ts` (red before
-the change).
+`tests/store/account-kv.test.ts`, `tests/persistence/route.test.ts`, and the
+burst case in `tests/store/kv-persist.test.ts` (red before the change).
 
 ### A course's images are generated a few at a time, and the pill names the model
 

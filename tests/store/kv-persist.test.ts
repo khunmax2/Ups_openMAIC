@@ -392,6 +392,26 @@ describe('createKVPersistStorage — write ordering', () => {
 
     expect(await h.kv.get(NAME, 'account')).toEqual({ state: { nickname: 'B' }, version: 4 });
   });
+
+  // Fork (2026-09-15): dragging a panel width writes the whole store on every
+  // pointer move. Harmless in localStorage; against a server-backed scope each
+  // queued snapshot became its own request, written in order, each one already
+  // stale when it went out.
+  it('writes only the newest of a burst of snapshots', async () => {
+    const h = harness();
+    const persist = await hydrated(h.storage());
+    const sets = vi.spyOn(h.kv, 'set');
+
+    await Promise.all([
+      persist.setItem(NAME, { state: { nickname: 'a' }, version: 4 }),
+      persist.setItem(NAME, { state: { nickname: 'b' }, version: 4 }),
+      persist.setItem(NAME, { state: { nickname: 'c' }, version: 4 }),
+    ]);
+
+    expect(sets.mock.calls.filter(([key]) => isBlobKey(key))).toHaveLength(1);
+    expect(await h.kv.get(NAME, 'account')).toEqual({ state: { nickname: 'c' }, version: 4 });
+    expect(problems()).toEqual([]);
+  });
 });
 
 describe('createKVPersistStorage — clearing closes the gate synchronously', () => {
