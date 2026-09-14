@@ -509,6 +509,28 @@ Tests: `tests/persistence/account-kv.test.ts` (including upstream's own
 `tests/store/account-kv.test.ts`, `tests/persistence/route.test.ts` (red before
 the change).
 
+### A course's images are generated a few at a time, and the pill names the model
+
+Two findings from the 2026-09-14 report.
+
+"Images come up slowly": the media orchestrator starts alongside slide
+generation but upstream requested every image strictly one after another, so a
+long course's last picture arrived minutes behind its slides. It now keeps up to
+`MEDIA_GENERATION_CONCURRENCY` requests in flight (server env, default 2,
+clamped to 1..6), handed to the browser through `/api/server-providers` beside
+`PARALLEL_SCENE_CONCURRENCY` and for the same reason: the right number depends
+on the image backend -- one self-hosted GPU wants few, a hosted API takes more
+-- and a burst over a key's quota comes back as 429s. `1` is upstream's order
+exactly, and a browser whose server does not report the value stays serial.
+Requests still start in outline order; an abort stops anything not yet started.
+
+The home model pill showed only the provider's icon and the thinking level, so
+two models of one provider looked the same until hovered. It now shows the
+model's name, truncated (`ModelSettingsPopover`, `generation-toolbar.tsx`).
+
+Tests: `tests/media/media-orchestrator-concurrency.test.ts`,
+`tests/server/media-generation-concurrency.test.ts` (red before the change).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

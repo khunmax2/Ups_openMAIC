@@ -15,6 +15,7 @@ import { fetchProxiedMediaUrl } from '@/lib/media/proxy-media-cache';
 import { createLogger } from '@/lib/logger';
 import { apiPath } from '@/lib/base-path';
 import { uploadGeneratedMedia } from '@/lib/media/persist-generated-media';
+import { mapWithConcurrency } from '@/lib/utils/concurrency';
 
 const log = createLogger('MediaOrchestrator');
 
@@ -68,11 +69,18 @@ export async function generateMediaForOutlines(
   // Enqueue all as pending
   useMediaGenerationStore.getState().enqueueTasks(stageId, allRequests);
 
-  // Process requests serially — image/video APIs have limited concurrency
-  for (const req of allRequests) {
-    if (abortSignal?.aborted) break;
-    await generateSingleMedia(req, stageId, abortSignal);
-  }
+  // Fork: up to the server-set number at once (MEDIA_GENERATION_CONCURRENCY,
+  // synced into settings) instead of strictly one after another, which left a
+  // long course's last picture minutes behind its slides. Without a server
+  // value this is upstream's serial loop; requests start in outline order
+  // either way, and an abort stops anything not yet started.
+  const limit = Math.max(1, Math.floor(settings.mediaGenerationConcurrency ?? 1));
+  await mapWithConcurrency(
+    allRequests,
+    limit,
+    (req) => generateSingleMedia(req, stageId, abortSignal),
+    { shouldContinue: () => !abortSignal?.aborted },
+  );
 }
 
 /**

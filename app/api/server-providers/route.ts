@@ -7,6 +7,7 @@ import {
   getServerVideoProviders,
   getServerWebSearchProviders,
   getParallelSceneConcurrency,
+  getMediaGenerationConcurrency,
 } from '@/lib/server/provider-config';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { createLogger } from '@/lib/logger';
@@ -25,6 +26,8 @@ export async function GET() {
       webSearch: getServerWebSearchProviders(),
       generation: {
         parallelSceneConcurrency: getParallelSceneConcurrency(),
+        // Fork: images/videos requested at once (MEDIA_GENERATION_CONCURRENCY).
+        mediaGenerationConcurrency: getMediaGenerationConcurrency(),
       },
     });
   } catch (error) {

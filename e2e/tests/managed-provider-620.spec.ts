@@ -75,7 +75,9 @@ test.describe('#620 managed providers are read-only', () => {
     // The mock pins an allowed model list, so the catalog is locked too:
     // no add/reset affordance, and the pinned models are shown read-only.
     await expect(page.getByRole('button', { name: /new model/i })).toHaveCount(0);
-    await expect(page.getByText('gpt-4o', { exact: true })).toBeVisible();
+    // Fork: scoped to the dialog -- the home model pill behind it now shows the
+    // selected model's name too, so the bare text matches twice.
+    await expect(page.getByRole('dialog').getByText('gpt-4o', { exact: true })).toBeVisible();
 
     await page.screenshot({
       path: `${SCREENSHOT_DIR}/620-managed-openai-readonly.png`,
