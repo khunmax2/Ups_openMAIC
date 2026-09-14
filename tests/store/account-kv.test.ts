@@ -10,7 +10,11 @@ import type { KVStore } from '@openmaic/storage';
  * machine -- keys live in the credential store only.
  */
 
-import { SeededAccountKV, keysStayOutOfPersistedSettings } from '@/lib/store/account-kv';
+import {
+  SeededAccountKV,
+  keysStayOutOfPersistedSettings,
+  rehydrateWhenVisible,
+} from '@/lib/store/account-kv';
 
 function memoryKv(initial: Record<string, unknown> = {}) {
   const data = new Map<string, unknown>(Object.entries(initial));
@@ -25,6 +29,108 @@ function memoryKv(initial: Record<string, unknown> = {}) {
 }
 
 const asKv = (kv: ReturnType<typeof memoryKv>) => kv as unknown as KVStore;
+
+// Found in the 2026-09-15 review. Settings used to belong to the browser, so
+// two accounts that shared one browser shared one copy; adopting it for every
+// account carried that mix-up into each account for good.
+describe('SeededAccountKV — one browser, several accounts', () => {
+  it("hands this browser's copy to the first account that opens the studio here, and no other", async () => {
+    const local = memoryKv({ 'settings-storage': { state: { modelId: 'm1' } } });
+    const accountA = memoryKv();
+    const accountB = memoryKv();
+
+    await expect(
+      new SeededAccountKV(asKv(accountA), asKv(local)).get('settings-storage'),
+    ).resolves.toEqual({ state: { modelId: 'm1' } });
+    await expect(
+      new SeededAccountKV(asKv(accountB), asKv(local)).get('settings-storage'),
+    ).resolves.toBeNull();
+    expect(accountB.set).not.toHaveBeenCalled();
+  });
+});
+
+// Found in the same review: the adopted copy went up exactly as the browser
+// held it, bypassing the settings store's own key masking.
+describe('SeededAccountKV — keys never reach the server', () => {
+  const withKey = {
+    state: {
+      providersConfig: {
+        openai: { apiKey: 'sk-real', baseUrl: '' },
+        shared: { apiKey: '***' },
+        empty: { apiKey: '' },
+      },
+    },
+  };
+  const masked = {
+    state: {
+      providersConfig: {
+        openai: { apiKey: '***', baseUrl: '' },
+        shared: { apiKey: '***' },
+        empty: { apiKey: '' },
+      },
+    },
+  };
+
+  it('masks an adopted copy on the way up, but hands the store the key so the credential sync can move it', async () => {
+    const remote = memoryKv();
+    const local = memoryKv({ s: withKey });
+    await expect(new SeededAccountKV(asKv(remote), asKv(local)).get('s')).resolves.toEqual(withKey);
+    expect(remote.data.get('s')).toEqual(masked);
+  });
+
+  it('masks every write', async () => {
+    const remote = memoryKv();
+    await new SeededAccountKV(asKv(remote), asKv(memoryKv())).set('s', withKey);
+    expect(remote.data.get('s')).toEqual(masked);
+  });
+});
+
+// Found in the same review: settings are one blob, and a tab left open holds an
+// old copy in memory -- the next change there wrote it over what another
+// browser had saved since. Reading the server again on return narrows that.
+describe('rehydrateWhenVisible', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  function fakeDocument() {
+    const listeners: Array<() => void> = [];
+    const doc = {
+      visibilityState: 'visible',
+      addEventListener: vi.fn((type: string, listener: () => void) => {
+        if (type === 'visibilitychange') listeners.push(listener);
+      }),
+    };
+    const show = (state: 'visible' | 'hidden') => {
+      doc.visibilityState = state;
+      for (const listener of listeners) listener();
+    };
+    return { doc, show };
+  }
+
+  it('reads a server-backed store again when its tab comes back', () => {
+    vi.stubGlobal('window', {});
+    vi.stubEnv('NEXT_PUBLIC_PERSISTENCE', '1');
+    const { doc, show } = fakeDocument();
+    vi.stubGlobal('document', doc);
+    const rehydrate = vi.fn();
+
+    rehydrateWhenVisible(rehydrate);
+    show('hidden');
+    expect(rehydrate).not.toHaveBeenCalled();
+    show('visible');
+    expect(rehydrate).toHaveBeenCalledOnce();
+  });
+
+  it('leaves a browser-only store alone', () => {
+    vi.stubEnv('NEXT_PUBLIC_PERSISTENCE', '');
+    const { doc } = fakeDocument();
+    vi.stubGlobal('document', doc);
+    rehydrateWhenVisible(vi.fn());
+    expect(doc.addEventListener).not.toHaveBeenCalled();
+  });
+});
 
 describe('SeededAccountKV', () => {
   it("serves the server's value and leaves the local copy alone", async () => {

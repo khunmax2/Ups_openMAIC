@@ -41,7 +41,7 @@ import {
   isLLMProviderConfigured,
 } from '@/lib/store/settings-validation';
 import { createKVPersistStorage, purgeLegacyPersistKey } from '@/lib/store/kv-persist';
-import { keysStayOutOfPersistedSettings } from '@/lib/store/account-kv';
+import { keysStayOutOfPersistedSettings, rehydrateWhenVisible } from '@/lib/store/account-kv';
 import { isTTSProviderEnabled } from '@/lib/audio/provider-enablement';
 import { apiPath } from '@/lib/base-path';
 
@@ -2321,6 +2321,11 @@ const keepCustomTTSVoiceListed = (state: SettingsState) => {
 };
 useSettingsStore.subscribe(keepCustomTTSVoiceListed);
 keepCustomTTSVoiceListed(useSettingsStore.getState());
+
+// Fork: this store is one blob, and a tab left open holds an old copy of it; its
+// next change would write that copy over what another browser saved since. Read
+// the account's copy again whenever the tab comes back (lib/store/account-kv.ts).
+rehydrateWhenVisible(() => useSettingsStore.persist.rehydrate());
 
 // Best-effort, fire-and-forget: drop the pre-cutover raw `localStorage` blob.
 // It is never read (this store does not migrate legacy data), and the old blob

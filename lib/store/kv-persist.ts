@@ -630,6 +630,10 @@ export function createKVPersistStorage<S>(
     return replay;
   }
 
+  // Fork: the newest write issued per key (see `setItem`).
+  const newestWrite = new Map<string, number>();
+  let writeSequence = 0;
+
   return {
     getItem(name) {
       const state = stateFor(name);
@@ -678,7 +682,15 @@ export function createKVPersistStorage<S>(
     setItem(name, value) {
       const state = stateFor(name);
       if (!state.admitWrite(value)) return Promise.resolve();
+      const sequence = ++writeSequence;
+      newestWrite.set(name, sequence);
       return serial(name, async () => {
+        // Fork: a newer snapshot of this key was issued after this one and is
+        // queued behind it, so writing this one would only be overwritten. A
+        // burst -- a dragged panel width writes on every pointer move -- is one
+        // write instead of one request per stale snapshot to a server-backed
+        // scope. The newer write carries all the bookkeeping.
+        if (newestWrite.get(name) !== sequence) return;
         const kvStorage = resolveKvStorage();
         if (!kvStorage) {
           if (isBrowserRuntime()) {

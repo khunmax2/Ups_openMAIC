@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { createKVPersistStorage, purgeLegacyPersistKey } from '@/lib/store/kv-persist';
+import { rehydrateWhenVisible } from '@/lib/store/account-kv';
 
 /**
  * Bound after the store exists; see `onWriteRefused` for why it is not inlined.
@@ -66,6 +67,11 @@ export const useUserProfileStore = create<UserProfileState>()(
 // Bound after the store exists so the `onWriteRefused` hook above stays free of
 // a self-reference (see the comment there).
 recovery.rehydrate = () => useUserProfileStore.persist.rehydrate();
+
+// Fork: read the account's profile again whenever the tab comes back, so a tab
+// left open does not write an old copy over one saved elsewhere
+// (lib/store/account-kv.ts).
+rehydrateWhenVisible(() => useUserProfileStore.persist.rehydrate());
 
 // Best-effort, fire-and-forget: drop the pre-cutover raw `localStorage` blob.
 // It is never read (this store does not migrate legacy data), so a leftover is
