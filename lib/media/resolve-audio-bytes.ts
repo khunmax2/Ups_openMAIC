@@ -1,6 +1,7 @@
 import { db } from '@/lib/utils/database';
 import { isConcreteMediaAddress } from './resolve-media-ref';
 import { withAssetUrl } from './use-asset-url';
+import { fetchServedBytes, isServedMediaReference } from './stage-media-assets';
 
 /**
  * Bytes an audio reference currently resolves to.
@@ -12,7 +13,20 @@ import { withAssetUrl } from './use-asset-url';
  * one function, with Dexie kept as the fallback for legacy and imported rows
  * that were never pool-backed.
  */
-export async function resolveAudioBlob(audioId: string): Promise<Blob | null> {
+export interface ResolveAudioOptions {
+  /**
+   * Fork. Fetch an `audioId` that is itself a served reference
+   * (`/api/classroom-media/...`) when this browser holds no copy. Exports and
+   * the editor's preview ask for it; playback has its own fallback and status
+   * checks must not download every clip.
+   */
+  readonly fetchServed?: boolean;
+}
+
+export async function resolveAudioBlob(
+  audioId: string,
+  options: ResolveAudioOptions = {},
+): Promise<Blob | null> {
   const pooled = await pooledAudioBlob(audioId);
   if (pooled) return pooled;
   const record = await db.audioFiles.get(audioId);
@@ -20,7 +34,9 @@ export async function resolveAudioBlob(audioId: string): Promise<Blob | null> {
   // Zero-byte rows (evicted, or an empty fetch) are not playable narration:
   // report no bytes so callers keep the reference retryable instead of
   // playing silence.
-  return bytes && bytes.size > 0 ? bytes : null;
+  if (bytes && bytes.size > 0) return bytes;
+  if (options.fetchServed && isServedMediaReference(audioId)) return fetchServedBytes(audioId);
+  return null;
 }
 
 /** Resolve several ids at once, preserving input order. */

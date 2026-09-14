@@ -90,3 +90,5 @@ jobs:
           tests/server/media-generation-concurrency.test.ts
           tests/media/media-orchestrator-served-copies.test.ts
           tests/store/kv-persist.test.ts
+          tests/media/served-copies.test.ts
+          tests/audio/regenerate-speech-tts-served.test.ts

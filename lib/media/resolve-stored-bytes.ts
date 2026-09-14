@@ -83,6 +83,13 @@ export interface ResolveStoredBytesOptions {
   readonly resolutionGating?: boolean;
   /** Validation applied to every fetched byte source. */
   readonly fetchPolicy: StoredBytesFetchPolicy;
+  /**
+   * Fork. The course's served copies (`stage.mediaAssets`: placeholder ->
+   * `/api/classroom-media/...`), a level after the compatibility row for a
+   * reader in a browser that never held these bytes. Gated like the row, and
+   * always strict: a served copy must answer 200 with bytes.
+   */
+  readonly servedCopies?: Readonly<Record<string, string>>;
 }
 
 /** The document ref a compatibility row's compound id (`stageId:ref`) names. */
@@ -138,6 +145,18 @@ export async function resolveStoredBytes(
         url: 'dexie:media',
       });
       if (state.kind === 'url') return stored;
+    }
+  }
+
+  const served =
+    options.servedCopies && Object.hasOwn(options.servedCopies, effectiveRef)
+      ? options.servedCopies[effectiveRef]
+      : undefined;
+  if (served) {
+    const state = resolveMediaRef(effectiveRef, gate, { status: 'resolved', url: served });
+    if (state.kind === 'url') {
+      const bytes = await fetchBytes(served, { requireOk: true, requireNonEmpty: true });
+      if (bytes) return bytes;
     }
   }
 

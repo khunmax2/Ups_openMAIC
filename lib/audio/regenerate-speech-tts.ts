@@ -11,6 +11,7 @@ import { generateAndStoreTTS } from '@/lib/hooks/use-scene-generator';
 import { useStageStore } from '@/lib/store/stage';
 import { proveExclusiveAssetOwnership } from '@/lib/media/collect-stage-asset-refs';
 import { resolveAudioBlob } from '@/lib/media/resolve-audio-bytes';
+import { isServedMediaReference } from '@/lib/media/stage-media-assets';
 import { assetRefExists } from '@/lib/media/use-asset-url';
 
 /** Legacy deterministic Dexie key used before pool allocation. */
@@ -45,25 +46,31 @@ export function isManagedTtsActive(): boolean {
   return s.ttsEnabled && s.ttsProviderId !== 'browser-native-tts';
 }
 
-/** True if an audio blob is cached under this exact audioId. */
+/**
+ * True if an audio blob is cached under this exact audioId. Fork: or the id is
+ * a clip stored on the server, which every browser has.
+ */
 export async function audioExists(audioId: string): Promise<boolean> {
+  if (isServedMediaReference(audioId)) return true;
   return !!(await db.audioFiles.get(audioId));
 }
 
-/** Existence for many audioIds in one IndexedDB round-trip. */
+/** Existence for many audioIds in one IndexedDB round-trip (served clips need none). */
 export async function audioExistsBulk(audioIds: string[]): Promise<Set<string>> {
   if (audioIds.length === 0) return new Set();
-  const recs = await db.audioFiles.bulkGet(audioIds);
-  const have = new Set<string>();
+  const have = new Set(audioIds.filter((audioId) => isServedMediaReference(audioId)));
+  const local = audioIds.filter((audioId) => !have.has(audioId));
+  if (local.length === 0) return have;
+  const recs = await db.audioFiles.bulkGet(local);
   recs.forEach((r, i) => {
-    if (r) have.add(audioIds[i]);
+    if (r) have.add(local[i]);
   });
   return have;
 }
 
 /** Object URL for the audio this id currently resolves to (caller revokes). */
 export async function audioObjectUrl(audioId: string): Promise<string | null> {
-  const blob = await resolveAudioBlob(audioId);
+  const blob = await resolveAudioBlob(audioId, { fetchServed: true });
   return blob ? URL.createObjectURL(blob) : null;
 }
 
