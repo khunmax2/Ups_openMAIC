@@ -423,14 +423,26 @@ content hash (`generated-<sha256>.<ext>`), unguessable, and appears only in the
 owner's documents. The bytes live on the studio's `/app/data` volume, which
 `deploy/backup-studio.sh` archives nightly.
 
-Generated video still uses the browser path; courses generated before this keep
-their media in the creating browser until the migration below uploads it.
+Generated video still uses the browser path.
+
+Courses generated before this keep their media in the creating browser, so the
+owner's visit there moves it (`lib/media/migrate-stage-media.ts`, started by
+both classroom hosts behind the same owner gate as resuming). Each local image
+and clip goes up once through the same route; the document then records it the
+same way new media is recorded (`mediaAssets`, or the speech action's
+`audioId`/`audioUrl` via the store's `replaceSpeechAudio`). Media this browser
+never held is skipped -- the browser that has it moves it on its own visit. The
+first refused upload stops the run without marking the course done, so the next
+visit retries; uploads are content-addressed, so a retry never duplicates a
+file. A course the owner never reopens in its creating browser keeps its media
+there: nothing on the server can reach those bytes.
 
 Tests: `tests/agent-runtime/stage-media-upload-route.test.ts`,
 `tests/media/persist-generated-media.test.ts`,
 `tests/audio/audio-player-server-audio-id.test.ts`,
 `tests/media/stage-media-assets.test.ts`,
-`tests/store/stage-media-assets-store.test.ts` (red before the change).
+`tests/store/stage-media-assets-store.test.ts`,
+`tests/media/migrate-stage-media.test.ts` (red before the change).
 
 ## Rebasing onto a new upstream
 

@@ -12,7 +12,7 @@ import {
 import { createSelectors } from '@/lib/utils/create-selectors';
 import type { ResumeGate } from '@/lib/classroom/progressive-load-policy';
 import { notifyServerGenerationComplete } from '@/lib/classroom/generation-complete-mirror';
-import { withStageMediaAsset } from '@/lib/media/stage-media-assets';
+import { withSpeechAudioRef, withStageMediaAsset } from '@/lib/media/stage-media-assets';
 import type { ChatSession } from '@/lib/types/chat';
 import type { SceneOutline } from '@/lib/types/generation';
 import { createLogger } from '@/lib/logger';
@@ -381,6 +381,8 @@ interface StageState {
    * loaded is dropped.
    */
   setStageMediaAsset: (stageId: string, placeholder: string, ref: string) => void;
+  /** Fork: point every speech line that played `fromId` at the served `ref`. */
+  replaceSpeechAudio: (stageId: string, fromId: string, ref: string) => void;
   setGenerationStatus: (status: 'idle' | 'generating' | 'paused' | 'completed' | 'error') => void;
   setCurrentGeneratingOrder: (order: number) => void;
   bumpGenerationEpoch: () => void;
@@ -818,6 +820,21 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
     set({ stage: withStageMediaAsset(stage, placeholder, ref) });
     // Part of the stage document: rides the shared pending-change scheduler.
     markPendingChanges(stage.id, { kind: 'stage' });
+  },
+
+  replaceSpeechAudio: (stageId, fromId, ref) => {
+    const { stage, scenes } = get();
+    if (!stage || stage.id !== stageId) return;
+    const changed: string[] = [];
+    const next = scenes.map((scene) => {
+      const updated = withSpeechAudioRef(scene, fromId, ref);
+      if (!updated) return scene;
+      changed.push(scene.id);
+      return updated;
+    });
+    if (changed.length === 0) return;
+    set({ scenes: next });
+    for (const sceneId of changed) markPendingChanges(stage.id, { kind: 'scene', sceneId });
   },
 
   setGenerationStatus: (generationStatus) => set({ generationStatus }),

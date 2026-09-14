@@ -14,6 +14,7 @@ import { useWhiteboardHistoryStore } from '@/lib/store/whiteboard-history';
 import { createLogger } from '@/lib/logger';
 import { MediaStageProvider } from '@/lib/contexts/media-stage-context';
 import { generateMediaForOutlines } from '@/lib/media/media-orchestrator';
+import { startStageMediaMigration } from '@/lib/media/migrate-stage-media';
 import { useAgentRegistry } from '@/lib/orchestration/registry/store';
 import { shouldResumeClassroomGeneration } from '@/lib/classroom/progressive-load-policy';
 import { resolveClassroomViewerAccess } from '@/lib/classroom/viewer-access';
@@ -214,6 +215,14 @@ export default function ClassroomDetailPage() {
       });
     }
   }, [loading, error, generateRemaining, resumeGate]);
+
+  // Fork: a course generated before its media went to the server still keeps
+  // it only in the browser that made it; the owner's visit there moves it
+  // (lib/media/migrate-stage-media.ts). Same owner gate as resuming.
+  useEffect(() => {
+    if (loading || error || resumeGate !== 'allowed') return;
+    startStageMediaMigration(classroomId);
+  }, [loading, error, resumeGate, classroomId]);
 
   return (
     <ThemeProvider>

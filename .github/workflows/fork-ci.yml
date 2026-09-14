@@ -81,3 +81,4 @@ jobs:
           tests/store/stage-media-assets-store.test.ts
           tests/agent-runtime/stage-media-upload-route.test.ts
           tests/audio/audio-player-server-audio-id.test.ts
+          tests/media/migrate-stage-media.test.ts
