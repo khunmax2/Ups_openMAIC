@@ -471,7 +471,19 @@ export async function generateAndStoreTTS(
   // clip onto a timeline without re-decoding. null → leave undefined; the audio
   // still persists and plays.
   const duration = measureAudioDuration(bytes, data.format) ?? undefined;
-  const audioId = existingAudioId ?? requestId;
+  // Fork: the clip also goes to the server through upstream's classroom-media
+  // byte path, and its served reference becomes the audioId -- the same shape
+  // the agent runtime's scene TTS stamps -- so it plays in any browser and for
+  // a published course's learners (lib/media/persist-generated-media.ts). The
+  // IndexedDB row below stays what this browser plays first.
+  const { audioMimeForFormat, uploadGeneratedMedia } =
+    await import('@/lib/media/persist-generated-media');
+  const mime = audioMimeForFormat(data.format);
+  const serverRef =
+    stageId && mime
+      ? await uploadGeneratedMedia({ stageId, blob, mime, prefix: 'tts' })
+      : undefined;
+  const audioId = serverRef ?? existingAudioId ?? requestId;
   await db.audioFiles.put({
     id: audioId,
     stageId,
@@ -535,6 +547,10 @@ export async function generateTTSForScene(
       );
       if (assetId) {
         action.audioId = assetId;
+        // Fork: a server-stored clip carries its reference on the legacy
+        // audioUrl too, exactly as the agent runtime's scene TTS does, so
+        // every narration consumer (playback, previews, exports) finds it.
+        if (assetId.startsWith('/')) (action as { audioUrl?: string }).audioUrl = assetId;
         freshAllocations.push(assetId);
       }
     } catch (error) {

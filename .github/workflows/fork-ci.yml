@@ -76,3 +76,8 @@ jobs:
           tests/classroom/viewer-access.test.ts
           tests/classroom/generation-complete-mirror.test.ts
           tests/store/stage-generation-complete-mirror.test.ts
+          tests/media/stage-media-assets.test.ts
+          tests/media/persist-generated-media.test.ts
+          tests/store/stage-media-assets-store.test.ts
+          tests/agent-runtime/stage-media-upload-route.test.ts
+          tests/audio/audio-player-server-audio-id.test.ts

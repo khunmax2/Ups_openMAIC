@@ -16,6 +16,15 @@ const log = createLogger('AudioPlayer');
  * endpoint must not pin a playback line indefinitely. */
 const LEGACY_URL_FETCH_TIMEOUT_MS = 15_000;
 
+/**
+ * Fork: an audioId that is itself a served reference (`/api/classroom-media/...`,
+ * or an absolute URL). Allocated and legacy ids (`ast_…`, `tts_s…`) never start
+ * with `/` or a scheme. A plain check keeps this module free of the media graph.
+ */
+function isServedMediaRef(audioId: string): boolean {
+  return audioId.startsWith('/') || /^https?:\/\//iu.test(audioId);
+}
+
 /** Bytes an audio id currently resolves to, pool first. Loaded lazily to keep
  * this module importable without the media graph. */
 async function resolveBytes(audioId: string): Promise<Blob | null> {
@@ -104,13 +113,18 @@ export class AudioPlayer {
       let blob = await resolveBytes(audioId);
       if (requestToken !== this.requestToken) return false;
 
+      // Fork: narration stored through the classroom-media byte path carries
+      // its served reference AS the audioId (as the agent runtime's scene TTS
+      // stamps it). A browser without the bytes -- anyone but the one that
+      // generated it -- plays that reference, exactly like a legacy URL.
+      const fallbackUrl = legacyUrl ?? (isServedMediaRef(audioId) ? audioId : undefined);
       let directUrl: string | undefined;
-      if (!blob && legacyUrl) {
+      if (!blob && fallbackUrl) {
         const controller = new AbortController();
         this.fetchAbort = controller;
         const timeout = setTimeout(() => controller.abort(), LEGACY_URL_FETCH_TIMEOUT_MS);
         try {
-          const response = await fetch(legacyUrl, { signal: controller.signal });
+          const response = await fetch(fallbackUrl, { signal: controller.signal });
           const fetched = response.ok ? await response.blob() : null;
           // Zero-byte responses are not narration: fall back to the URL so a
           // later attempt can retry, and never play silence.
@@ -128,7 +142,7 @@ export class AudioPlayer {
           // A superseded play never reaches here -- the token check above
           // already returned false -- so only ordinary fetch/CORS/timeout
           // failures fall back to the element.
-          directUrl = legacyUrl;
+          directUrl = fallbackUrl;
         }
       }
 

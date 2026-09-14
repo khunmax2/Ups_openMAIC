@@ -14,6 +14,7 @@ import type { MediaGenerationRequest } from '@/lib/media/types';
 import { fetchProxiedMediaUrl } from '@/lib/media/proxy-media-cache';
 import { createLogger } from '@/lib/logger';
 import { apiPath } from '@/lib/base-path';
+import { uploadGeneratedMedia } from '@/lib/media/persist-generated-media';
 
 const log = createLogger('MediaOrchestrator');
 
@@ -180,6 +181,11 @@ async function generateSingleMedia(
       });
       const objectUrl = URL.createObjectURL(blob);
       useMediaGenerationStore.getState().markDone(req.elementId, objectUrl);
+      // Fork: the bytes also go to the server-backed pool, and the stage
+      // records which asset this placeholder became, so the image renders in
+      // any browser and for a published course's learners. Background and
+      // best-effort: it never slows or fails generation.
+      void recordImageOnServer(blob, stageId, req.elementId);
     } else {
       const result = await callVideoApi(req, abortSignal);
 
@@ -264,6 +270,20 @@ async function generateSingleMedia(
         .catch(() => {}); // best-effort
     }
   }
+}
+
+/** Fork: see the call site in generateSingleMedia. */
+async function recordImageOnServer(
+  blob: Blob,
+  stageId: string,
+  placeholder: string,
+): Promise<void> {
+  // The proxy can hand back a generic type; the byte route stores images only.
+  const mime = blob.type.startsWith('image/') ? blob.type : 'image/png';
+  const ref = await uploadGeneratedMedia({ stageId, blob, mime, prefix: 'generated' });
+  if (!ref) return;
+  const { useStageStore } = await import('@/lib/store/stage');
+  useStageStore.getState().setStageMediaAsset(stageId, placeholder, ref);
 }
 
 async function callImageApi(
