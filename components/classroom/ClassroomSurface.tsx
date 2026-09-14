@@ -38,6 +38,7 @@ import { useCanvasStore } from '@/lib/store/canvas';
 import { createLogger } from '@/lib/logger';
 import { MediaStageProvider } from '@/lib/contexts/media-stage-context';
 import { generateMediaForOutlines } from '@/lib/media/media-orchestrator';
+import { startStageMediaMigration } from '@/lib/media/migrate-stage-media';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { FileQuestion, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -331,6 +332,14 @@ export function ClassroomSurface({
       });
     }
   }, [loading, error, generateRemaining, resumeGate]);
+
+  // Fork: a course generated before its media went to the server still keeps
+  // it only in the browser that made it; the owner's visit there moves it
+  // (lib/media/migrate-stage-media.ts). Same owner gate as resuming.
+  useEffect(() => {
+    if (loading || error || resumeGate !== 'allowed') return;
+    startStageMediaMigration(classroomId);
+  }, [loading, error, resumeGate, classroomId]);
 
   return (
     <ThemeProvider>
