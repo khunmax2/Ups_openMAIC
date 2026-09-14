@@ -18,6 +18,7 @@ import { getThinkingConfigKey, supportsConfigurableThinking } from '@/lib/ai/thi
 import type { TTSProviderId, ASRProviderId, BuiltInTTSProviderId } from '@/lib/audio/types';
 import type { AgentVoiceOverride } from '@/lib/audio/voice-resolver';
 import { isCustomTTSProvider, isCustomASRProvider } from '@/lib/audio/types';
+import { correctedCustomTTSVoice } from '@/lib/audio/custom-tts-voice';
 import {
   ASR_PROVIDERS,
   DEFAULT_TTS_VOICES,
@@ -2290,6 +2291,17 @@ export const useSettingsStore = create<SettingsState>()(
 // Bound after the store exists so the `onWriteRefused` hook above stays free of
 // a self-reference (see the comment there).
 recovery.rehydrate = () => useSettingsStore.persist.rehydrate();
+
+// Fork: a custom TTS provider's selected voice stays inside its voice list,
+// whichever write moved it out -- the credential sync bringing a shared
+// provider's voices after it was selected, a restored blob, a direct setState
+// (lib/audio/custom-tts-voice.ts). After every change, and once now.
+const keepCustomTTSVoiceListed = (state: SettingsState) => {
+  const voice = correctedCustomTTSVoice(state);
+  if (voice !== undefined) useSettingsStore.setState({ ttsVoice: voice });
+};
+useSettingsStore.subscribe(keepCustomTTSVoiceListed);
+keepCustomTTSVoiceListed(useSettingsStore.getState());
 
 // Best-effort, fire-and-forget: drop the pre-cutover raw `localStorage` blob.
 // It is never read (this store does not migrate legacy data), and the old blob

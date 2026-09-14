@@ -305,9 +305,13 @@ async function generateOpenAITTS(
   });
 
   if (!response.ok) {
-    throwIfTtsRateLimited('OpenAI', response.status);
-    const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(`OpenAI TTS API error: ${error.error?.message || response.statusText}`);
+    // Fork: custom providers come through here too. Name the failure after
+    // what was called, and read the reason the way the other OpenAI-compatible
+    // providers do -- a FastAPI server puts it in `detail`, which the
+    // OpenAI-only read dropped ("OpenAI TTS API error: Bad Request").
+    const label = isCustomTTSProvider(config.providerId) ? 'Custom' : 'OpenAI';
+    throwIfTtsRateLimited(label, response.status);
+    throw new Error(`${label} TTS API error: ${await readTTSApiError(response)}`);
   }
 
   const arrayBuffer = await response.arrayBuffer();
