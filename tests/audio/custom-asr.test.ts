@@ -238,6 +238,48 @@ describe('Custom ASR provider (custom-asr-*)', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  // Fork. The recorder now sends a custom provider WAV; the server must say so,
+  // because a gateway that saves the upload under its own name and decodes by
+  // what that name claims fails on "audio.webm" holding WAV bytes.
+  it('names a WAV Blob upload audio.wav', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'ok' }) });
+    const wav = new Blob([new TextEncoder().encode('RIFF\0\0\0\0WAVEfmt ')], { type: 'audio/wav' });
+
+    await transcribeAudio(
+      { providerId: 'custom-asr-ptm', baseUrl: 'https://asr.example/v1', modelId: 'ptm-asr-1' },
+      wav,
+    );
+
+    const file = (mockFetch.mock.calls[0][1].body as FormData).get('file') as File;
+    expect(file.name).toBe('audio.wav');
+    expect(file.type).toBe('audio/wav');
+  });
+
+  it('names a WAV Buffer upload audio.wav', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'ok' }) });
+
+    await transcribeAudio(
+      { providerId: 'custom-asr-ptm', baseUrl: 'https://asr.example/v1', modelId: 'ptm-asr-1' },
+      Buffer.from('RIFF\0\0\0\0WAVEfmt ', 'latin1'),
+    );
+
+    const file = (mockFetch.mock.calls[0][1].body as FormData).get('file') as File;
+    expect(file.name).toBe('audio.wav');
+    expect(file.type).toBe('audio/wav');
+  });
+
+  it('keeps the WebM name for a WebM upload', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'ok' }) });
+
+    await transcribeAudio(
+      { providerId: 'custom-asr-ptm', baseUrl: 'https://asr.example/v1', modelId: 'ptm-asr-1' },
+      webmBuffer(),
+    );
+
+    const file = (mockFetch.mock.calls[0][1].body as FormData).get('file') as File;
+    expect(file.name).toBe('audio.webm');
+  });
+
   it('accepts a Blob input directly', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

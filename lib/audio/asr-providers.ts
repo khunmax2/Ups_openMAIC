@@ -333,7 +333,9 @@ async function transcribeCustomOpenAICompatibleASR(
     ) as ArrayBuffer;
     // Preserve existing type when converting from Buffer; fall back to webm
     // (the default recording format used by the browser MediaRecorder API).
-    audioBlob = new Blob([arrayBuffer], { type: 'audio/webm' });
+    audioBlob = new Blob([arrayBuffer], {
+      type: detectWavBuffer(audioBuffer) ? 'audio/wav' : 'audio/webm',
+    });
   }
 
   // Most OpenAI-compatible transcription endpoints treat `model` as a
@@ -349,7 +351,10 @@ async function transcribeCustomOpenAICompatibleASR(
 
   const formData = new FormData();
   // Use 'file' key — required by the OpenAI audio/transcriptions spec.
-  formData.set('file', audioBlob, 'audio.webm');
+  // Fork: the name follows the bytes. The recorder sends a custom provider WAV
+  // (lib/audio/wav-utils.ts), and a gateway that stores the upload under this
+  // name and decodes by what it claims fails on "audio.webm" holding WAV.
+  formData.set('file', audioBlob, (await isWavAudio(audioBlob)) ? 'audio.wav' : 'audio.webm');
   formData.set('model', config.modelId);
   formData.set('response_format', 'json');
   if (config.language && config.language !== 'auto') {
