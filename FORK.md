@@ -612,6 +612,41 @@ Tests: `tests/server/credentials.test.ts` (the record, the admin-only answer,
 the log lines) and `tests/credentials/share-audit.test.ts` (red before the
 change).
 
+### A tab keeps to its account, removed built-ins stay removed, and writes leave a trail
+
+Three findings from one report (2026-09-15): a model the user added to
+OpenRouter kept vanishing, and the two built-in DeepSeek models they had
+deleted kept coming back. All three were reproduced in a browser before the
+change.
+
+- **A tab kept writing as the account it had loaded (audit F01).** The
+  settings are one blob per account, held in a tab's memory. When another tab
+  signed in as someone else, the shared cookie sent this tab's next write to
+  that account. One click in the stale tab wrote one account's whole settings
+  as another's first row. Every `/kv` answer now carries a one-way tag of the
+  account it was served for (`x-studio-kv-owner`, `lib/persistence/account-kv.ts`).
+  The page remembers the first tag it saw and sends it with each write, and
+  the server refuses a write whose tag no longer matches (409 `OWNER_CHANGED`).
+  When an answer comes from a different account the page reloads once, as the
+  account now signed in (`createOwnerGuard`, `lib/store/account-kv.ts`). A
+  client without the tag writes as before.
+- **Deleted built-in models came back.** Upstream rebuilds each built-in
+  provider's list from the registry on every rehydrate. With settings re-read
+  whenever a tab returns, that happened constantly, and the page's own writes
+  saved the restored list. The store now records which built-ins are missing
+  from a provider's list after an edit (`hiddenBuiltInModels`) and the rebuild
+  leaves those out (`lib/store/hidden-builtin-models.ts`). Adding the model
+  back, or Reset, shows it again; a built-in the registry gains later is shown.
+- **Nothing recorded which write dropped a setting.** Every account-KV write
+  and delete is now logged as `[AccountKV]` with the owner, the key, the size
+  and, for the settings blob, the selected provider/model and how many models
+  that provider lists. The value itself is never logged.
+
+Tests: `tests/persistence/account-kv.test.ts` (the tag, the 409, the log, and
+upstream's `HttpKVStore` with the guard driven through a mid-session account
+switch), `tests/store/account-kv-owner-guard.test.ts`,
+`tests/store/hidden-builtin-models.test.ts` (a store-level rehydrate).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

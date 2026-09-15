@@ -94,3 +94,5 @@ jobs:
           tests/media/served-copies.test.ts
           tests/audio/regenerate-speech-tts-served.test.ts
           tests/store/account-kv-persisted-store.test.ts
+          tests/store/account-kv-owner-guard.test.ts
+          tests/store/hidden-builtin-models.test.ts
