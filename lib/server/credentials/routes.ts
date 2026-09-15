@@ -12,6 +12,7 @@
  * role comes from the gateway's header, never from the request body.
  */
 
+import { createLogger } from '@/lib/logger';
 import { readVerifiedOrAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import {
@@ -38,6 +39,8 @@ import {
 const PROVIDER_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_FIELD = 4096;
 
+const log = createLogger('Credentials');
+
 function json(status: number, body: unknown): Response {
   return Response.json(body, { status });
 }
@@ -58,11 +61,21 @@ export interface MaskedCredential {
   masked: string;
   baseUrl: string;
   profile?: ProviderProfile;
+  /**
+   * Fork. On a default row, answered to an admin only: when it was shared,
+   * whether this admin shared it, and which account did.
+   */
+  sharedAt?: number;
+  sharedByYou?: boolean;
+  sharedBy?: string;
 }
 
 export type MaskedSet = Partial<Record<CredentialSection, Record<string, MaskedCredential>>>;
 
-function maskSet(rows: CredentialSet['own'] | CredentialSet['defaults']): MaskedSet {
+function maskSet(
+  rows: CredentialSet['own'] | CredentialSet['defaults'],
+  describe?: (row: StoredCredential) => Partial<MaskedCredential>,
+): MaskedSet {
   const out: MaskedSet = {};
   for (const [section, providers] of Object.entries(rows) as Array<
     [CredentialSection, Record<string, StoredCredential>]
@@ -74,11 +87,17 @@ function maskSet(rows: CredentialSet['own'] | CredentialSet['defaults']): Masked
           masked: maskCredential(row.apiKey),
           baseUrl: row.baseUrl,
           ...(row.profile ? { profile: row.profile } : {}),
+          ...(describe ? describe(row) : {}),
         },
       ]),
     );
   }
   return out;
+}
+
+/** An owner id as an admin can look it up: the account id, without the channel prefix. */
+function accountOf(ownerId: string): string {
+  return ownerId.replace(/^user:/u, '');
 }
 
 export async function handleList(request: Request): Promise<Response> {
@@ -93,12 +112,28 @@ export async function handleList(request: Request): Promise<Response> {
     return json(200, { role, storage: 'none', own: {}, defaults: {} });
   }
   const set = await listCredentials(store, owner);
+  // Fork. Any admin may share, replace or stop a default, so an admin is told
+  // whose key each shared one is and since when. Other accounts are not told
+  // who; they only use it.
+  const sharer =
+    role === 'admin'
+      ? (row: StoredCredential): Partial<MaskedCredential> => ({
+          sharedByYou: !!row.updatedBy && row.updatedBy === owner,
+          ...(row.updatedBy ? { sharedBy: accountOf(row.updatedBy) } : {}),
+          ...(row.updatedAt ? { sharedAt: row.updatedAt } : {}),
+        })
+      : undefined;
   return json(200, {
     role,
     storage: 'server',
     own: maskSet(set.own),
-    defaults: maskSet(set.defaults),
+    defaults: maskSet(set.defaults, sharer),
   });
+}
+
+/** Whose share a change touched, for the log line. Ids only -- never a key. */
+function sharedBy(previous: StoredCredential | null): string {
+  return previous?.updatedBy || 'an admin, before sharers were recorded';
 }
 
 interface Address {
@@ -195,10 +230,18 @@ export async function handleWrite(request: Request, segments: string[]): Promise
     return jsonError(503, 'PERSISTENCE_NOT_CONFIGURED', 'server persistence not configured');
   }
   const full = { ...address, ownerId: owner };
+  const shared = address.scope === 'default';
+  const target = `${address.section}/${address.providerId}`;
+  // Fork. Any admin may change what every account falls back to, so each
+  // change is logged with who made it and whose share it touched.
+  const previous = shared ? await readCredential(store, full) : null;
 
   if (request.method === 'DELETE') {
     const removed = await deleteCredential(store, full);
-    invalidateCredentialCache(address.scope === 'default' ? undefined : owner);
+    invalidateCredentialCache(shared ? undefined : owner);
+    if (shared && removed) {
+      log.info(`Stopped sharing ${target}: by ${owner}; it was shared by ${sharedBy(previous)}`);
+    }
     return json(200, { removed });
   }
   if (request.method !== 'PUT') {
@@ -226,8 +269,22 @@ export async function handleWrite(request: Request, segments: string[]): Promise
     if (ssrfError) return jsonError(403, 'INVALID_URL', ssrfError);
   }
   const { copyFromOwner: _copy, ...fields } = patch;
-  const stored = await upsertCredential(store, full, fields);
-  invalidateCredentialCache(address.scope === 'default' ? undefined : owner);
+  const stored = await upsertCredential(store, full, fields, owner);
+  invalidateCredentialCache(shared ? undefined : owner);
+  if (shared) {
+    if (!stored) {
+      log.info(`Cleared the shared ${target}: by ${owner}; it was shared by ${sharedBy(previous)}`);
+    } else if (patch.apiKey !== undefined) {
+      const replaced = !previous
+        ? ''
+        : previous.updatedBy === owner
+          ? '; replaced their own earlier share'
+          : `; replaced the key shared by ${sharedBy(previous)}`;
+      log.info(`Shared ${target}: by ${owner}${replaced}`);
+    } else {
+      log.info(`Updated the shared ${target} (endpoint or description): by ${owner}`);
+    }
+  }
   return json(200, {
     stored: stored ? { masked: maskCredential(stored.apiKey), baseUrl: stored.baseUrl } : null,
   });

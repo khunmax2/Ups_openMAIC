@@ -15,6 +15,16 @@
 import { useState } from 'react';
 import { Check, ChevronDown, Eye, EyeOff, Trash2, Users } from 'lucide-react';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,6 +43,7 @@ import {
   shareCredential,
   type CredentialSection,
 } from '@/lib/credentials/client';
+import { describeSharer, shareEffect } from '@/lib/credentials/share-audit';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useSettingsStore } from '@/lib/store/settings';
 import { cn } from '@/lib/utils';
@@ -67,7 +78,7 @@ export function ApiKeyField({
   className,
   credential,
 }: ApiKeyFieldProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [show, setShow] = useState(false);
   // A key the user typed here can be revealed; one that arrived from storage
   // cannot. `typed` flips on the first keystroke and never back.
@@ -75,6 +86,8 @@ export function ApiKeyField({
   const [editing, setEditing] = useState(false);
   const [previous, setPrevious] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Fork: which change to the shared key is waiting on the admin's yes.
+  const [confirming, setConfirming] = useState<'replace' | 'stop' | null>(null);
   // The pages swap providers without remounting their inputs. Reset when the
   // field's identity changes, or a key typed for provider A would leave
   // provider B's stored key revealable.
@@ -85,6 +98,7 @@ export function ApiKeyField({
     setTyped(false);
     setEditing(false);
     setPrevious(null);
+    setConfirming(null);
   }
 
   const key = credential ? metaKey(credential.section, credential.providerId) : undefined;
@@ -98,6 +112,15 @@ export function ApiKeyField({
     !!defaultRow &&
     meta.masked === defaultRow.masked &&
     meta.baseUrl === defaultRow.baseUrl;
+  // Fork. Sharing my key over the shared one, or stopping a share, changes
+  // what every account without its own key uses; both ask first, and say
+  // whose key it is (lib/credentials/share-audit.ts).
+  const effect = shareEffect(meta?.source === 'own' ? meta : undefined, defaultRow);
+  const sharer = defaultRow
+    ? describeSharer(defaultRow, t, (ms) =>
+        new Date(ms).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }),
+      )
+    : undefined;
 
   const stored = Boolean(value) && !typed && !editing;
 
@@ -194,7 +217,7 @@ export function ApiKeyField({
                       <Check className="h-3.5 w-3.5 text-primary" />
                       {t('settings.apiKeyIsShared')}
                     </DropdownMenuLabel>
-                    <DropdownMenuItem className="gap-2" onClick={() => void stopSharing()}>
+                    <DropdownMenuItem className="gap-2" onClick={() => setConfirming('stop')}>
                       <Users className="h-3.5 w-3.5" />
                       <span className="flex flex-col">
                         <span>{t('settings.apiKeyStopSharing')}</span>
@@ -205,12 +228,24 @@ export function ApiKeyField({
                     </DropdownMenuItem>
                   </>
                 ) : (
-                  <DropdownMenuItem className="gap-2" onClick={() => void share()}>
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onClick={() => {
+                      if (effect === 'replace') setConfirming('replace');
+                      else void share();
+                    }}
+                  >
                     <Users className="h-3.5 w-3.5" />
                     <span className="flex flex-col">
-                      <span>{t('settings.apiKeyShare')}</span>
+                      <span>
+                        {effect === 'replace'
+                          ? t('settings.apiKeyShareReplace')
+                          : t('settings.apiKeyShare')}
+                      </span>
                       <span className="text-[11px] text-muted-foreground">
-                        {t('settings.apiKeyShareHint')}
+                        {effect === 'replace'
+                          ? t('settings.apiKeyShareReplaceHint')
+                          : t('settings.apiKeyShareHint')}
                       </span>
                     </span>
                   </DropdownMenuItem>
@@ -246,6 +281,51 @@ export function ApiKeyField({
             </span>
           </div>
         )}
+        {serverBacked && role === 'admin' && sharer && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span>{sharer}</span>
+          </div>
+        )}
+        <AlertDialog
+          open={confirming !== null}
+          onOpenChange={(open) => {
+            if (!open) setConfirming(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {confirming === 'stop'
+                  ? t('settings.apiKeyStopTitle')
+                  : t('settings.apiKeyReplaceTitle')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="flex flex-col gap-2">
+                {sharer && <span>{sharer}</span>}
+                <span>
+                  {confirming === 'stop'
+                    ? t('settings.apiKeyStopBody')
+                    : t('settings.apiKeyReplaceBody')}
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction
+                variant={confirming === 'stop' ? 'destructive' : 'default'}
+                onClick={() => {
+                  const action = confirming;
+                  setConfirming(null);
+                  void (action === 'stop' ? stopSharing() : share());
+                }}
+              >
+                {confirming === 'stop'
+                  ? t('settings.apiKeyStopConfirm')
+                  : t('settings.apiKeyReplaceConfirm')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }

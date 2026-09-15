@@ -17,6 +17,8 @@ type Row = {
   api_key: string;
   base_url: string;
   profile?: string;
+  updated_by?: string;
+  updated_at?: number;
 };
 
 function memoryQueryable(rows: Row[] = []): Queryable & { rows: Row[] } {
@@ -57,6 +59,8 @@ function memoryQueryable(rows: Row[] = []): Queryable & { rows: Row[] } {
           api_key: p[4]!,
           base_url: p[5]!,
           ...(p[6] ? { profile: p[6] } : {}),
+          // Fork: who wrote it ($9) and when ($8), recorded when a writer is named.
+          ...(p[8] ? { updated_by: p[8], updated_at: Number(p[7]) } : {}),
         };
         const i = rows.findIndex((r) => key(r) === key(next));
         if (i >= 0) rows[i] = next;
@@ -182,6 +186,27 @@ describe('credential store', () => {
       apiKey: 'sk-2',
       baseUrl: 'http://tts/v1',
       profile,
+    });
+  });
+
+  // Fork. Any admin may share a default; the row has to say whose key it is.
+  it('records who wrote a row, and reads it back', async () => {
+    const { upsertCredential, readCredential, listCredentials } =
+      await import('@/lib/server/credentials/store');
+    const q = memoryQueryable();
+    const address = {
+      scope: 'default' as const,
+      ownerId: 'user:boss',
+      section: 'image' as const,
+      providerId: 'custom-image',
+    };
+    await upsertCredential(q, address, { apiKey: 'shared' }, 'user:boss');
+    expect(q.rows[0]).toMatchObject({ owner_id: '', updated_by: 'user:boss' });
+    expect(await readCredential(q, address)).toMatchObject({ updatedBy: 'user:boss' });
+    const set = await listCredentials(q, 'user:someone');
+    expect(set.defaults.image?.['custom-image']).toMatchObject({
+      updatedBy: 'user:boss',
+      updatedAt: expect.any(Number),
     });
   });
 
@@ -542,8 +567,107 @@ describe('credential routes', () => {
         customDefaultBaseUrl: 'http://tts.internal/v1',
         customVoices: [{ id: 'nova', name: 'Nova' }],
       },
+      sharedByYou: false,
+      sharedBy: 'boss',
+      sharedAt: expect.any(Number),
     });
     expect(JSON.stringify(list)).not.toContain('smuggled');
+  });
+
+  // Fork. Any admin may share, replace or stop a default (FORK.md, "Who shared
+  // a key is recorded"). The next admin has to see whose key they would
+  // replace; an ordinary account only uses the shared key.
+  it('tells admins, and only admins, who shared a default and when', async () => {
+    const { handleWrite, handleList } = await armRoutes([
+      {
+        scope: 'owner',
+        owner_id: 'user:boss',
+        section: 'providers',
+        provider_id: 'google',
+        api_key: 'AIza-boss-0000000000-abcd',
+        base_url: '',
+      },
+    ]);
+    const share = await handleWrite(
+      new Request('http://s/x', {
+        method: 'PUT',
+        headers: { ...as('user:boss', 'admin'), 'content-type': 'application/json' },
+        body: JSON.stringify({ copyFromOwner: true }),
+      }),
+      ['default', 'providers', 'google'],
+    );
+    expect(share.status).toBe(200);
+
+    const listAs = async (owner: string, role: 'admin' | 'user') => {
+      const res = await handleList(
+        new Request('http://s/api/studio/credentials', { headers: as(owner, role) }),
+      );
+      return (await res.json()).defaults.providers.google;
+    };
+    expect(await listAs('user:boss', 'admin')).toEqual({
+      masked: 'AIza-••••abcd',
+      baseUrl: '',
+      sharedByYou: true,
+      sharedBy: 'boss',
+      sharedAt: expect.any(Number),
+    });
+    expect(await listAs('user:demo', 'admin')).toMatchObject({
+      sharedByYou: false,
+      sharedBy: 'boss',
+    });
+    expect(await listAs('user:learner', 'user')).toEqual({ masked: 'AIza-••••abcd', baseUrl: '' });
+  });
+
+  it('logs who shared, replaced and stopped a default, and whose it was -- never a key', async () => {
+    const info = vi.fn();
+    vi.doMock('@/lib/logger', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@/lib/logger')>();
+      return {
+        ...actual,
+        createLogger: (tag: string) => {
+          const real = actual.createLogger(tag);
+          return tag === 'Credentials' ? { ...real, info } : real;
+        },
+      };
+    });
+    const { handleWrite } = await armRoutes([
+      {
+        scope: 'owner',
+        owner_id: 'user:boss',
+        section: 'providers',
+        provider_id: 'google',
+        api_key: 'AIza-boss-0000000000-abcd',
+        base_url: '',
+      },
+      {
+        scope: 'owner',
+        owner_id: 'user:demo',
+        section: 'providers',
+        provider_id: 'google',
+        api_key: 'AIza-demo-1111111111-wxyz',
+        base_url: '',
+      },
+    ]);
+    const call = (owner: string, method: 'PUT' | 'DELETE') =>
+      handleWrite(
+        new Request('http://s/x', {
+          method,
+          headers: { ...as(owner, 'admin'), 'content-type': 'application/json' },
+          ...(method === 'PUT' ? { body: JSON.stringify({ copyFromOwner: true }) } : {}),
+        }),
+        ['default', 'providers', 'google'],
+      );
+    expect((await call('user:boss', 'PUT')).status).toBe(200);
+    expect((await call('user:demo', 'PUT')).status).toBe(200);
+    expect((await call('user:boss', 'DELETE')).status).toBe(200);
+
+    const lines = info.mock.calls.map(([line]) => String(line));
+    expect(lines).toEqual([
+      'Shared providers/google: by user:boss',
+      'Shared providers/google: by user:demo; replaced the key shared by user:boss',
+      'Stopped sharing providers/google: by user:boss; it was shared by user:demo',
+    ]);
+    expect(lines.join('\n')).not.toMatch(/AIza/u);
   });
 
   it("refuses a profile on an account's own row", async () => {

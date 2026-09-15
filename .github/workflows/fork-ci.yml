@@ -72,6 +72,7 @@ jobs:
           tests/audio/custom-asr.test.ts
           tests/server/credentials.test.ts
           tests/credentials/client.test.ts
+          tests/credentials/share-audit.test.ts
           tests/classroom/progressive-load-policy.test.ts
           tests/classroom/viewer-access.test.ts
           tests/classroom/generation-complete-mirror.test.ts

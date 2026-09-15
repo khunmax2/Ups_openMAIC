@@ -585,6 +585,33 @@ model's name, truncated (`ModelSettingsPopover`, `generation-toolbar.tsx`).
 Tests: `tests/media/media-orchestrator-concurrency.test.ts`,
 `tests/server/media-generation-concurrency.test.ts` (red before the change).
 
+### Who shared a key is recorded, and replacing or stopping a share asks first
+
+Any admin may share a provider's key with every account -- the gatekeeper
+sends role `admin` for every DeepWitya administrator, promoted ones included
+-- and that stays so by decision (2026-09-15). What was missing was the record
+and the pause. A provider has ONE shared row, so a second admin's share
+silently replaced the first admin's key for every account (costs and quota
+moved with it), and stopping a share took the provider away from everyone at
+once; nothing said who had done either. The shared image key disappeared on
+2026-09-14 and nobody could say how.
+
+- `studio_credential.updated_by` records the owner id behind every write; on
+  a default row that is the admin who shared it. Added with
+  `ADD COLUMN IF NOT EXISTS`; older rows read as "shared before sharers were
+  recorded".
+- The list answer tells an admin -- only an admin -- whether they shared each
+  default, which account did, and when.
+- The key row shows that under a shared key, and asks before sharing over a
+  different shared key or stopping a share (`components/settings/api-key-field.tsx`,
+  rules in `lib/credentials/share-audit.ts`).
+- Every change to a shared row is logged as `[Credentials]` with who made it
+  and whose share it touched -- owner ids, never a key.
+
+Tests: `tests/server/credentials.test.ts` (the record, the admin-only answer,
+the log lines) and `tests/credentials/share-audit.test.ts` (red before the
+change).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,
