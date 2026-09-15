@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   catalogFromList,
+  newerCatalog,
   orgDefaultFor,
   personalBuiltIns,
   withOrgModels,
@@ -100,6 +101,28 @@ describe('orgDefaultFor', () => {
     expect(orgDefaultFor({ providersConfig: noKey }, org)).toBeNull();
     expect(orgDefaultFor({ providersConfig: notListed }, org)).toBeNull();
     expect(orgDefaultFor({ providersConfig: usable }, { models: {} })).toBeNull();
+  });
+});
+
+describe('newerCatalog', () => {
+  const at = (servedAt?: number): OrgCatalogAnswer => ({
+    models: {},
+    ...(servedAt ? { servedAt } : {}),
+  });
+
+  it('keeps whichever copy the server read later, held or saved', () => {
+    expect(newerCatalog(at(2), at(1))?.servedAt).toBe(2);
+    expect(newerCatalog(at(1), at(2))?.servedAt).toBe(2);
+  });
+
+  it('counts a copy with no stamp as the oldest, and keeps the held copy on a tie', () => {
+    const held = at(5);
+    expect(newerCatalog(held, at())).toBe(held);
+    expect(newerCatalog(at(), held)).toBe(held);
+    expect(newerCatalog(held, at(5))).toBe(held);
+    expect(newerCatalog(null, held)).toBe(held);
+    expect(newerCatalog(held, undefined)).toBe(held);
+    expect(newerCatalog(undefined, null)).toBeNull();
   });
 });
 

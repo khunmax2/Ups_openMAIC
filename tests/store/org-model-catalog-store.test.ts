@@ -73,4 +73,38 @@ describe("the settings store applies the organisation's model catalog", () => {
     expect(store.getState().providerId).toBe('google');
     expect(store.getState().modelId).toBe('gemini-3.6-flash');
   });
+
+  it('keeps the newer catalog when a tab comes back, whichever tab saved the settings', () => {
+    const store = useSettingsStore;
+    const merge = store.persist.getOptions().merge!;
+    const grok = { id: 'x-ai/grok-4-fast', name: 'Grok 4 Fast' };
+    const catalog = (servedAt: number, extra: Array<{ id: string; name: string }>) => ({
+      models: { openrouter: { hidden: [], extra } },
+      servedAt,
+    });
+    const ids = (state: ReturnType<typeof store.getState>) =>
+      state.providersConfig.openrouter.models.map((m) => m.id);
+
+    // This tab heard from the server after an admin added Grok...
+    store.setState({ orgModelCatalog: catalog(2000, [gemini, grok]) });
+    store.setState(applyOrgCatalog(store.getState()));
+    expect(ids(store.getState())).toContain(grok.id);
+
+    // ...then a tab opened before that saved the account's settings.
+    const stale = JSON.parse(JSON.stringify(store.getState()));
+    stale.orgModelCatalog = catalog(1000, [gemini]);
+    stale.providersConfig.openrouter.models = stale.providersConfig.openrouter.models.filter(
+      (m: { id: string }) => m.id !== grok.id,
+    );
+    const back = merge(stale, store.getState());
+    expect(back.orgModelCatalog?.servedAt).toBe(2000);
+    expect(ids(back)).toContain(grok.id);
+
+    // A copy saved by a tab that heard a later answer wins over this tab's.
+    const newer = JSON.parse(JSON.stringify(store.getState()));
+    newer.orgModelCatalog = catalog(3000, [gemini]);
+    const later = merge(newer, store.getState());
+    expect(later.orgModelCatalog?.servedAt).toBe(3000);
+    expect(ids(later)).not.toContain(grok.id);
+  });
 });

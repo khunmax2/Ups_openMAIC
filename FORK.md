@@ -678,6 +678,13 @@ keeps them and every account applies them.
 - The organisation's default model is selected until the account picks a
   model itself (`llmModelIsUserSet`, set only by the picker), and only while
   that provider is usable for the account.
+- The catalog is saved with each account's settings, and any tab of the
+  account may save them, one opened before the last change included. So each
+  answer carries `servedAt`, and a tab keeps whichever copy was read later,
+  its own or the saved one (`newerCatalog`). Letting the saved copy win, as
+  the first cut did, took a newly added model away from a fresh tab as soon
+  as an older tab saved; found in a browser before merge. An open tab sees a
+  change on its next load, or when a newer tab of the account saves.
 - In the provider panel an admin publishes the list as it stands, updates or
   removes it, stars the default, and brings a hidden registry model back.
   While a list is published, an admin's delete of a registry or organisation
@@ -689,8 +696,9 @@ keeps them and every account applies them.
 Tests: `tests/credentials/org-models.test.ts` (the list and default rules),
 `tests/server/org-catalog.test.ts` (admin-only writes, what is kept, who is
 told what, the log), `tests/store/org-model-catalog-store.test.ts` (the real
-store: a new account and a reload, and a model the person picked). All three
-were red before the change.
+store: a new account and a reload, a model the person picked, and a tab
+coming back after an older or a newer tab saved). All three were red before
+the change.
 
 ## Rebasing onto a new upstream
 

@@ -181,7 +181,7 @@ describe('organisation model catalog routes', () => {
     const list = await (
       await handleList(new Request('http://s/api/studio/credentials', { headers: admin }))
     ).json();
-    expect(list.org).toEqual({ models: {} });
+    expect(list.org).toEqual({ models: {}, servedAt: expect.any(Number) });
     expect(logged.info).toEqual([
       "Set the organisation's openrouter models: by user:boss (hides 1, adds 1)",
       "Removed the organisation's openrouter models: by user:boss",

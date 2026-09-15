@@ -51,6 +51,7 @@ import {
 } from '@/lib/store/hidden-builtin-models';
 import {
   orgDefaultFor,
+  newerCatalog,
   personalBuiltIns,
   withOrgModels,
   type OrgCatalogAnswer,
@@ -2401,7 +2402,13 @@ export const useSettingsStore = create<SettingsState>()(
         delete persisted.editInsertToolbarCollapsed;
         const merged = { ...currentState, ...persisted };
         ensureBuiltInProviders(merged as Partial<SettingsState>);
-        // Fork: the organisation's model catalog, kept from the last server answer.
+        // Fork: the organisation's model catalog. The copy saved with the
+        // settings may come from any tab of the account, one opened before the
+        // last change included, so the later read wins, not the later write.
+        merged.orgModelCatalog = newerCatalog(
+          currentState.orgModelCatalog,
+          persisted.orgModelCatalog as OrgCatalogAnswer | null | undefined,
+        );
         Object.assign(merged, applyOrgCatalog(merged as SettingsState));
         promoteLegacyCustomProviderBaseUrls(merged as Partial<SettingsState>);
         ensureBuiltInAudioProviders(merged as Partial<SettingsState>);

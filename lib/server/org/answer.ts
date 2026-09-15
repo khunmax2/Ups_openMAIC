@@ -16,6 +16,8 @@ interface Stamp {
 export interface OrgCatalogAnswer {
   models: Record<string, OrgProviderModels & Stamp>;
   defaultModel?: OrgDefaultModel & Stamp;
+  /** When the server read the catalog; a tab keeps whichever copy it holds is newer. */
+  servedAt: number;
 }
 
 /** An owner id as an admin can look it up: the account id, without the channel prefix. */
@@ -25,6 +27,7 @@ export function orgForViewer(
   catalog: OrgCatalog,
   role: 'admin' | 'user',
   owner: string,
+  servedAt = Date.now(),
 ): OrgCatalogAnswer {
   const stamp = (updatedBy: string, updatedAt: number): Stamp => ({
     updatedAt,
@@ -35,7 +38,7 @@ export function orgForViewer(
         }
       : {}),
   });
-  const answer: OrgCatalogAnswer = { models: {} };
+  const answer: OrgCatalogAnswer = { models: {}, servedAt };
   for (const [providerId, setting] of Object.entries(catalog.models)) {
     answer.models[providerId] = {
       ...setting.value,

@@ -44,6 +44,24 @@ export interface OrgDefaultAnswer {
 export interface OrgCatalogAnswer {
   models: Record<string, OrgModelsAnswer>;
   defaultModel?: OrgDefaultAnswer;
+  /** When the server read it; missing when the server could not. */
+  servedAt?: number;
+}
+
+/**
+ * The newer of the catalog a tab holds and another copy of it: the server's
+ * latest answer, or the one a tab of the same account saved with the
+ * settings. Any tab may have saved, one opened long ago included, so the
+ * later read wins rather than the later write. A copy with no stamp counts as
+ * the oldest; on a tie the held copy stays.
+ */
+export function newerCatalog(
+  held: OrgCatalogAnswer | null | undefined,
+  other: OrgCatalogAnswer | null | undefined,
+): OrgCatalogAnswer | null {
+  if (!other) return held ?? null;
+  if (!held) return other;
+  return (other.servedAt ?? 0) > (held.servedAt ?? 0) ? other : held;
 }
 
 /** One built-in provider's list with the organisation's catalog applied. */

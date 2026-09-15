@@ -34,7 +34,7 @@
 import { apiPath } from '@/lib/base-path';
 import { applyOrgCatalog, useSettingsStore, type SettingsState } from '@/lib/store/settings';
 
-import type { OrgCatalogAnswer } from './org-models';
+import { newerCatalog, type OrgCatalogAnswer } from './org-models';
 
 export const CREDENTIAL_SENTINEL = '***';
 
@@ -446,8 +446,9 @@ function applyMeta(
         );
       }
       // Fork: the organisation's model catalog, applied over the lists the
-      // credentials just shaped (lib/credentials/org-models.ts).
-      patch.orgModelCatalog = org ?? null;
+      // credentials just shaped (lib/credentials/org-models.ts). An answer the
+      // server could not read (no `servedAt`) keeps the copy this tab holds.
+      patch.orgModelCatalog = newerCatalog(state.orgModelCatalog, org);
       Object.assign(patch, applyOrgCatalog({ ...state, ...patch } as SettingsState));
       return patch;
     });
