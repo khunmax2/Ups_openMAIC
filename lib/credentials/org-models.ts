@@ -7,7 +7,9 @@
  * the registry's built-ins the organisation (or the person) did not hide, then
  * the organisation's additions, then the person's own additions. The
  * organisation's entries are marked `fromOrg`, so the page shows them as the
- * organisation's and offers no delete; the person keeps their own additions.
+ * organisation's and offers no delete; the person keeps their own additions,
+ * one the organisation also lists included (`ownCopy`): theirs again when the
+ * organisation drops it.
  * Pure, so the rules are tested without the store.
  */
 
@@ -17,6 +19,7 @@ interface ModelLike {
   id: string;
   name?: string;
   fromOrg?: boolean;
+  ownCopy?: boolean;
 }
 
 export interface OrgModelsAnswer {
@@ -72,17 +75,39 @@ export function withOrgModels<T extends ModelLike>(
   personalHidden: readonly string[] | undefined,
 ): T[] {
   const builtInIds = new Set(builtIns.map((model) => model.id));
-  const own = current.filter((model) => !builtInIds.has(model.id) && !model.fromOrg);
+  // The person's own additions, one the organisation lists too included: that
+  // entry carries `ownCopy`, so the model is theirs again once the
+  // organisation drops it.
+  const own = current.filter(
+    (model) => !builtInIds.has(model.id) && (!model.fromOrg || model.ownCopy),
+  );
+  const ownIds = new Set(own.map((model) => model.id));
   const hidden = new Set([...(org?.hidden ?? []), ...(personalHidden ?? [])]);
   const extra = (org?.extra ?? [])
     .filter((model) => !builtInIds.has(model.id))
-    .map((model) => ({ ...model, fromOrg: true }) as unknown as T);
+    .map(
+      (model) =>
+        ({
+          ...model,
+          fromOrg: true,
+          ...(ownIds.has(model.id) ? { ownCopy: true } : {}),
+        }) as unknown as T,
+    );
   const extraIds = new Set(extra.map((model) => model.id));
   return [
     ...builtIns.filter((model) => !hidden.has(model.id)),
     ...extra,
-    ...own.filter((model) => !extraIds.has(model.id)),
+    ...own.filter((model) => !extraIds.has(model.id)).map(asOwn),
   ];
+}
+
+/** An entry as the person's own again, without the organisation's marks. */
+function asOwn<T extends ModelLike>(model: T): T {
+  if (!model.fromOrg && !model.ownCopy) return model;
+  const copy = { ...model };
+  delete copy.fromOrg;
+  delete copy.ownCopy;
+  return copy;
 }
 
 /** The built-ins a person hides on their own, leaving out what the organisation hides. */

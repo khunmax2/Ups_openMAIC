@@ -41,15 +41,27 @@ describe('withOrgModels', () => {
     expect(list.find((m) => m.id === 'mine')).not.toHaveProperty('fromOrg');
   });
 
-  it("drops organisation entries the catalog no longer has, and a person's copy of one it has", () => {
+  it('drops organisation entries the catalog no longer has, unless the person had added them too', () => {
     const saved = [
       { id: 'old-org', name: 'gone', fromOrg: true },
       { id: gemini.id, name: 'my copy' },
     ];
+    // The organisation lists a model the person added: its entry shows, and
+    // remembers that the person had it.
     const withCatalog = withOrgModels(builtIns, saved, { hidden: [], extra: [gemini] }, undefined);
     expect(withCatalog.map((m) => m.id)).toEqual(['ds/pro', 'ds/flash', gemini.id]);
-    expect(withCatalog.find((m) => m.id === gemini.id)).toMatchObject({ fromOrg: true });
-    // No catalog any more: the organisation's entry goes, the person's own stays.
+    expect(withCatalog.find((m) => m.id === gemini.id)).toMatchObject({
+      fromOrg: true,
+      ownCopy: true,
+    });
+    // The organisation drops it, or its whole list: the model is the person's
+    // again, not gone (report 2026-09-15: models the user added kept vanishing).
+    for (const org of [{ hidden: [], extra: [] }, undefined]) {
+      const after = withOrgModels(builtIns, withCatalog, org, undefined);
+      expect(after.map((m) => m.id)).toEqual(['ds/pro', 'ds/flash', gemini.id]);
+      expect(after.find((m) => m.id === gemini.id)).toEqual({ ...gemini });
+    }
+    // An organisation entry the person never added just goes.
     expect(withOrgModels(builtIns, saved, undefined, undefined).map((m) => m.id)).toEqual([
       'ds/pro',
       'ds/flash',

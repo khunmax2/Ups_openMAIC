@@ -674,6 +674,9 @@ keeps them and every account applies them.
   `lib/credentials/org-models.ts`). A provider's list becomes the registry
   models, less those the organisation hides and those the account removed,
   then the organisation's models (marked `fromOrg`), then the account's own.
+  A model the account had added itself and the organisation also lists keeps
+  that fact (`ownCopy`), so when the organisation drops the model the account
+  keeps it. The first cut let it vanish; found in a browser before merge.
   A provider whose models the operator pins (`serverModels`) is left alone.
 - The organisation's default model is selected until the account picks a
   model itself (`llmModelIsUserSet`, set only by the picker), and only while
