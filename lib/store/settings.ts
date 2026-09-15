@@ -42,6 +42,13 @@ import {
 } from '@/lib/store/settings-validation';
 import { createKVPersistStorage, purgeLegacyPersistKey } from '@/lib/store/kv-persist';
 import { keysStayOutOfPersistedSettings, rehydrateWhenVisible } from '@/lib/store/account-kv';
+import {
+  hiddenAfterBulkEdit,
+  hiddenAfterEdit,
+  shownBuiltIns,
+  withHidden,
+  type HiddenBuiltInModels,
+} from '@/lib/store/hidden-builtin-models';
 import { isTTSProviderEnabled } from '@/lib/audio/provider-enablement';
 import { apiPath } from '@/lib/base-path';
 
@@ -239,6 +246,9 @@ export interface SettingsState {
       sharedBy?: string;
     }
   >;
+  // Fork: built-in models removed from a provider's list stay removed
+  // (lib/store/hidden-builtin-models.ts).
+  hiddenBuiltInModels: HiddenBuiltInModels;
 
   // Global TTS/ASR toggles
   ttsEnabled: boolean;
@@ -779,6 +789,11 @@ function ensureBuiltInAudioProviders(state: Partial<SettingsState>): void {
  * Called on every rehydrate (not just version migrations) so new providers
  * added in code are always picked up without clearing cache.
  */
+/** Fork: the registry's model ids for a built-in provider; none for a custom one. */
+function builtInModelIds(providerId: string): string[] {
+  return (PROVIDERS[providerId as ProviderId]?.models ?? []).map((m) => m.id);
+}
+
 function ensureBuiltInProviders(state: Partial<SettingsState>): void {
   if (!state.providersConfig) return;
   const defaultConfig = getDefaultProvidersConfig();
@@ -795,7 +810,11 @@ function ensureBuiltInProviders(state: Partial<SettingsState>): void {
 
       const builtInModelIds = new Set(provider.models.map((m) => m.id));
       const customModels = (existing.models || []).filter((m) => !builtInModelIds.has(m.id));
-      const mergedModels = [...provider.models, ...customModels];
+      // Fork: built-ins this person removed stay out (lib/store/hidden-builtin-models.ts).
+      const mergedModels = [
+        ...shownBuiltIns(provider.models, state.hiddenBuiltInModels?.[providerId]),
+        ...customModels,
+      ];
 
       state.providersConfig![providerId] = {
         ...existing,
@@ -950,6 +969,7 @@ export const useSettingsStore = create<SettingsState>()(
         credentialRole: 'user' as const,
         credentialMeta: {},
         credentialDefaults: {},
+        hiddenBuiltInModels: {},
         ttsModel: 'openai-tts',
         selectedAgentIds: ['default-1', 'default-2', 'default-3'],
         agentMode: 'auto' as const,
@@ -1044,6 +1064,15 @@ export const useSettingsStore = create<SettingsState>()(
               thinkingConfigs: pruneThinkingConfigs(state.thinkingConfigs, providersConfig),
               ...(nextProvider !== state.providerId && { providerId: nextProvider }),
               ...(nextModel !== state.modelId && { modelId: nextModel }),
+              // Fork: a built-in removed here stays removed on the next load;
+              // added back, or Reset, it shows again.
+              ...(config.models && {
+                hiddenBuiltInModels: withHidden(
+                  state.hiddenBuiltInModels,
+                  providerId,
+                  hiddenAfterEdit(builtInModelIds(providerId), config.models),
+                ),
+              }),
             };
           }),
 
@@ -1062,6 +1091,8 @@ export const useSettingsStore = create<SettingsState>()(
               thinkingConfigs: pruneThinkingConfigs(state.thinkingConfigs, config),
               ...(nextProvider !== state.providerId && { providerId: nextProvider }),
               ...(nextModel !== state.modelId && { modelId: nextModel }),
+              // Fork: the same rule as setProviderConfig, for every provider.
+              hiddenBuiltInModels: hiddenAfterBulkEdit(builtInModelIds, config),
             };
           }),
 

@@ -19,7 +19,30 @@
  * (`lib/store/account-kv.ts`); keys live in `studio_credential` only.
  */
 
+import { createHash } from 'node:crypto';
+
 import { splitSqlStatements, type Queryable } from '@openmaic/storage/document/pg';
+
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('AccountKV');
+
+/**
+ * Fork. Which account an answer was served for, as a short one-way tag.
+ *
+ * A tab keeps its stores in memory; when another tab signs in as someone
+ * else, the shared cookie makes this tab's next write land on that other
+ * account -- one click in a stale tab wrote one account's whole settings blob
+ * as another's (audit F01, reproduced 2026-09-15). Every answer carries the
+ * tag; the browser remembers the first one it saw and sends it back on each
+ * write (lib/store/account-kv.ts). A write claiming a different account is
+ * refused, and the browser reloads as the account now signed in.
+ */
+export const OWNER_HEADER = 'x-studio-kv-owner';
+
+export function ownerTag(ownerId: string): string {
+  return createHash('sha256').update(ownerId).digest('hex').slice(0, 16);
+}
 
 export const ACCOUNT_KV_SCHEMA = `
 CREATE TABLE IF NOT EXISTS studio_account_kv (
@@ -164,12 +187,19 @@ async function route(
     if (method === 'PUT') {
       const { value } = await readWriteBody(request);
       await ensureAccountKvSchema(queryable);
+      const text = JSON.stringify(value);
       await queryable.query(
         `INSERT INTO studio_account_kv (owner_id, key, value, updated_at)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (owner_id, key)
          DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
-        [ownerId, key, JSON.stringify(value), Date.now()],
+        [ownerId, key, text, Date.now()],
+      );
+      // Fork: a write trail, so a setting that vanishes can be traced to the
+      // write that dropped it. Who, which key, how big, which model -- never
+      // the value itself.
+      log.info(
+        `Wrote ${key} for ${ownerId} (${Buffer.byteLength(text, 'utf8')} bytes${describe(key, value)})`,
       );
       return new Response(null, { status: 204 });
     }
@@ -179,11 +209,41 @@ async function route(
         ownerId,
         key,
       ]);
+      log.info(`Deleted ${key} for ${ownerId}`);
       return new Response(null, { status: 204 });
     }
   }
 
   throw new KvHttpError(404, 'ROUTE_NOT_FOUND', 'route not found');
+}
+
+/** The settings write's selected model, for the write trail. Ids only. */
+function describe(key: string, value: unknown): string {
+  if (key !== 'settings-storage') return '';
+  const state = (value as { state?: Record<string, unknown> } | null)?.state;
+  if (!state || typeof state !== 'object') return '';
+  const provider = typeof state.providerId === 'string' ? state.providerId : '?';
+  const model = typeof state.modelId === 'string' ? state.modelId : '?';
+  const configs = state.providersConfig as Record<string, { models?: unknown }> | undefined;
+  const models = configs?.[provider]?.models;
+  const count = Array.isArray(models) ? `, ${models.length} ${provider} models` : '';
+  return `; llm ${provider}/${model}${count}`;
+}
+
+/** A write from a tab that loaded another account never lands. */
+function refuseAnotherAccountsWrite(request: Request, path: string, ownerId: string, tag: string) {
+  const method = request.method.toUpperCase();
+  if (method !== 'PUT' && method !== 'DELETE') return;
+  const claimed = request.headers.get(OWNER_HEADER);
+  // No tag: a client from before the guard, or a first write. The owner is
+  // still the verified identity; only a tab's memory of another one is refused.
+  if (!claimed || claimed === tag) return;
+  log.warn(`Refused ${method} ${path}: the tab loaded another account (signed in as ${ownerId})`);
+  throw new KvHttpError(
+    409,
+    'OWNER_CHANGED',
+    'this tab was loaded for another account; reload to continue as the one signed in',
+  );
 }
 
 /**
@@ -196,19 +256,25 @@ export async function handleAccountKvRequest(
   ownerId: string,
   queryable: Queryable,
 ): Promise<Response> {
+  const tag = ownerTag(ownerId);
+  let response: Response;
   try {
-    return await route(request, path, ownerId, queryable);
+    refuseAnotherAccountsWrite(request, path, ownerId, tag);
+    response = await route(request, path, ownerId, queryable);
   } catch (error) {
     if (error instanceof KvHttpError) {
-      return Response.json(
+      response = Response.json(
         { error: { code: error.code, message: error.message } },
         { status: error.status },
       );
+    } else {
+      console.error('account kv request failed', error);
+      response = Response.json(
+        { error: { code: 'INTERNAL_ERROR', message: 'internal server error' } },
+        { status: 500 },
+      );
     }
-    console.error('account kv request failed', error);
-    return Response.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'internal server error' } },
-      { status: 500 },
-    );
   }
+  response.headers.set(OWNER_HEADER, tag);
+  return response;
 }

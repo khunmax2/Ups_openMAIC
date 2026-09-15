@@ -153,15 +153,82 @@ export function rehydrateWhenVisible(rehydrate: () => unknown): void {
   });
 }
 
+/** The response header naming the account an answer was served for (lib/persistence/account-kv.ts). */
+export const OWNER_HEADER = 'x-studio-kv-owner';
+
+export interface OwnerGuard {
+  /** For `HttpKVStore`: every response is checked for the account it came from. */
+  readonly fetch: typeof globalThis.fetch;
+  /** For `HttpKVStore`: every write names the account this page was loaded for. */
+  readonly headers: (context: { method: string }) => Record<string, string>;
+  /** The account tag this page's stores were loaded for, once known. */
+  readonly owner: () => string | null;
+}
+
+/**
+ * Fork. Keeps one page's stores on the account they were loaded for (audit
+ * F01). A tab holds settings in memory; when another tab signs in as someone
+ * else, the shared cookie made this tab's next write land on that account --
+ * reproduced 2026-09-15, one click wrote one account's whole settings blob as
+ * another's. The first answer fixes this page's account; every write sends it
+ * back and the server refuses one that no longer matches; and the moment an
+ * answer comes from a different account the page reloads, as the account now
+ * signed in. Once per page: a reload is the whole remedy.
+ */
+export function createOwnerGuard(
+  options: { fetch?: typeof globalThis.fetch; onOwnerChanged?: () => void } = {},
+): OwnerGuard {
+  let pageOwner: string | null = null;
+  let handled = false;
+  const changed = () => {
+    if (handled) return;
+    handled = true;
+    (options.onOwnerChanged ?? reloadPage)();
+  };
+  const base: typeof globalThis.fetch =
+    options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  return {
+    owner: () => pageOwner,
+    headers: ({ method }) => {
+      const headers: Record<string, string> = {};
+      if (method !== 'GET' && pageOwner !== null) headers[OWNER_HEADER] = pageOwner;
+      return headers;
+    },
+    fetch: async (input, init) => {
+      const response = await base(input, init);
+      const seen = response.headers.get(OWNER_HEADER);
+      if (seen) {
+        if (pageOwner === null) pageOwner = seen;
+        else if (seen !== pageOwner) changed();
+      }
+      if (response.status === 409) {
+        const body = (await response
+          .clone()
+          .json()
+          .catch(() => null)) as { error?: { code?: unknown } } | null;
+        if (body?.error?.code === 'OWNER_CHANGED') changed();
+      }
+      return response;
+    },
+  };
+}
+
+function reloadPage(): void {
+  if (typeof window !== 'undefined') window.location.reload();
+}
+
 /** The backend `kv-persist` uses for the app's persisted stores. */
 export function createAppKVStore(): KVStore {
   const local = new BrowserKVStore();
   if (!accountStateLeavesBrowser()) return local;
+  const guard = createOwnerGuard();
   return new SeededAccountKV(
     new HttpKVStore({
       baseUrl: apiPath('/api/persistence'),
       deviceStore: local,
       credentials: 'include',
+      fetch: guard.fetch,
+      headers: guard.headers,
     }),
     local,
   );
