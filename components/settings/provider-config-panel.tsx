@@ -30,13 +30,19 @@ import {
   FileText,
   Send,
   Download,
+  Building2,
+  Eye,
+  Star,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
-import type { ProviderConfig } from '@/lib/ai/providers';
+import { PROVIDERS, type ProviderConfig, type ProviderId } from '@/lib/ai/providers';
 import type { ProvidersConfig } from '@/lib/types/settings';
 import { createVerifyModelRequest, formatContextWindow } from './utils';
 import { cn } from '@/lib/utils';
 import { apiPath } from '@/lib/base-path';
+import { refreshCredentials } from '@/lib/credentials/client';
+import { catalogFromList } from '@/lib/credentials/org-models';
+import { useSettingsStore } from '@/lib/store/settings';
 
 interface ProviderConfigPanelProps {
   provider: ProviderConfig;
@@ -73,7 +79,7 @@ export function ProviderConfigPanel({
   onResetToDefault,
   isBuiltIn,
 }: ProviderConfigPanelProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   // Local state for this provider
   const [apiKey, setApiKey] = useState(initialApiKey);
@@ -206,6 +212,81 @@ export function ProviderConfigPanel({
   // catalog is admin-managed too — view-only, no add/edit/delete. Without a
   // pinned list the server manages only credentials and the user curates models.
   const modelsLocked = !!providersConfig[provider.id]?.serverModels?.length;
+
+  // Fork: the organisation's model list for this provider, curated by an admin
+  // here and applied to every account (lib/credentials/org-models.ts).
+  const role = useSettingsStore((s) => s.credentialRole);
+  const serverBacked = useSettingsStore((s) => s.credentialStorage === 'server');
+  const orgCatalog = useSettingsStore((s) => s.orgModelCatalog);
+  const orgHere = orgCatalog?.models[provider.id];
+  const orgDefault = orgCatalog?.defaultModel;
+  const registry = PROVIDERS[provider.id as ProviderId]?.models ?? [];
+  const builtInIds = new Set(registry.map((m) => m.id));
+  const canCurate =
+    serverBacked && role === 'admin' && isBuiltIn && !modelsLocked && registry.length > 0;
+  const [orgConfirm, setOrgConfirm] = useState<
+    { kind: 'publish' } | { kind: 'remove' } | { kind: 'drop'; modelId: string } | null
+  >(null);
+  const [orgBusy, setOrgBusy] = useState(false);
+
+  const orgRequest = async (method: 'PUT' | 'DELETE', path: string, body?: unknown) => {
+    setOrgBusy(true);
+    try {
+      const res = await fetch(apiPath(`/api/studio/org/${path}`), {
+        method,
+        credentials: 'include',
+        ...(body === undefined
+          ? {}
+          : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      });
+      if (res.ok) await refreshCredentials();
+    } finally {
+      setOrgBusy(false);
+    }
+  };
+  const putOrgModels = (hidden: string[], extra: NonNullable<typeof orgHere>['extra']) =>
+    orgRequest('PUT', `llm-models/${provider.id}`, { hidden, extra });
+  const isOrgDefault = (modelId: string) =>
+    orgDefault?.providerId === provider.id && orgDefault.modelId === modelId;
+  const orgStamp = (() => {
+    if (!orgHere?.updatedAt) return '';
+    const time = new Date(orgHere.updatedAt).toLocaleString(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+    if (orgHere.updatedByYou) return t('settings.orgModelsByYou', { time });
+    return orgHere.updatedBy
+      ? t('settings.orgModelsByOther', { who: orgHere.updatedBy, time })
+      : '';
+  })();
+
+  // An admin's delete of the organisation's entry edits the organisation's list
+  // (after a question); anything else is this person's own list.
+  const deleteRow = (index: number) => {
+    const model = models[index];
+    if (model && canCurate && orgHere && (model.fromOrg || builtInIds.has(model.id))) {
+      setOrgConfirm({ kind: 'drop', modelId: model.id });
+      return;
+    }
+    onDeleteModel(index);
+  };
+  const confirmOrg = () => {
+    const pending = orgConfirm;
+    setOrgConfirm(null);
+    if (!pending) return;
+    if (pending.kind === 'publish') {
+      void orgRequest('PUT', `llm-models/${provider.id}`, catalogFromList(registry, models));
+    } else if (pending.kind === 'remove') {
+      void orgRequest('DELETE', `llm-models/${provider.id}`);
+    } else if (orgHere) {
+      void (builtInIds.has(pending.modelId)
+        ? putOrgModels([...new Set([...orgHere.hidden, pending.modelId])], orgHere.extra)
+        : putOrgModels(
+            orgHere.hidden,
+            orgHere.extra.filter((m) => m.id !== pending.modelId),
+          ));
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -430,6 +511,79 @@ export function ProviderConfigPanel({
           </div>
         )}
 
+        {/* Fork: the organisation's model list (lib/credentials/org-models.ts). */}
+        {canCurate && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-sm font-medium">
+                <Building2 className="h-4 w-4 text-primary" />
+                {orgHere ? t('settings.orgModelsTitle') : t('settings.orgModelsPublishHint')}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {orgHere ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={orgBusy}
+                      onClick={() => setOrgConfirm({ kind: 'publish' })}
+                    >
+                      {t('settings.orgModelsUpdate')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      disabled={orgBusy}
+                      onClick={() => setOrgConfirm({ kind: 'remove' })}
+                    >
+                      {t('settings.orgModelsRemove')}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={orgBusy}
+                    onClick={() => setOrgConfirm({ kind: 'publish' })}
+                  >
+                    {t('settings.orgModelsPublish')}
+                  </Button>
+                )}
+              </div>
+            </div>
+            {orgStamp && <div className="text-xs text-muted-foreground">{orgStamp}</div>}
+            {orgHere && orgHere.hidden.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <span>{t('settings.orgModelsHidden')}</span>
+                {orgHere.hidden.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    disabled={orgBusy}
+                    title={t('settings.orgModelsShowAgain')}
+                    onClick={() =>
+                      void putOrgModels(
+                        orgHere.hidden.filter((hidden) => hidden !== id),
+                        orgHere.extra,
+                      )
+                    }
+                    className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 hover:bg-muted"
+                  >
+                    <Eye className="h-3 w-3" />
+                    {registry.find((m) => m.id === id)?.name ?? id}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {!canCurate && orgHere && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Building2 className="h-3.5 w-3.5" />
+            {t('settings.orgModelsForEveryone')}
+          </div>
+        )}
+
         <div className="space-y-1.5">
           {models.map((model, index) => {
             return (
@@ -438,7 +592,21 @@ export function ProviderConfigPanel({
                 className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card"
               >
                 <div className="flex-1">
-                  <div className="font-mono text-sm font-medium mb-1.5">{model.name}</div>
+                  <div className="font-mono text-sm font-medium mb-1.5 flex flex-wrap items-center gap-1.5">
+                    {model.name}
+                    {model.fromOrg && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] font-medium text-primary">
+                        <Building2 className="h-3 w-3" />
+                        {t('settings.orgModelBadge')}
+                      </span>
+                    )}
+                    {isOrgDefault(model.id) && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-sans text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                        <Star className="h-3 w-3" />
+                        {t('settings.orgDefaultBadge')}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     {/* Capabilities */}
                     <div className="flex items-center gap-1">
@@ -479,23 +647,46 @@ export function ProviderConfigPanel({
                   </div>
                 </div>
 
-                {/* Edit/Delete Buttons — hidden when the model catalog is server-managed */}
-                {!modelsLocked && (
+                {/* Edit/Delete Buttons — hidden when the model catalog is server-managed.
+                    Fork: the organisation's entries are the organisation's to change --
+                    an admin's delete edits its list; nobody edits them in place. */}
+                {!modelsLocked && (!model.fromOrg || canCurate) && (
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2"
-                      onClick={() => onEditModel(index)}
-                      title={t('settings.editModel')}
-                    >
-                      <Settings2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {canCurate &&
+                      (builtInIds.has(model.id) || model.fromOrg) &&
+                      !isOrgDefault(model.id) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2"
+                          disabled={orgBusy}
+                          onClick={() =>
+                            void orgRequest('PUT', 'llm-default', {
+                              providerId: provider.id,
+                              modelId: model.id,
+                            })
+                          }
+                          title={t('settings.orgDefaultSet')}
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    {!model.fromOrg && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={() => onEditModel(index)}
+                        title={t('settings.editModel')}
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => onDeleteModel(index)}
+                      onClick={() => deleteRow(index)}
                       title={t('settings.deleteModel')}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -524,6 +715,42 @@ export function ProviderConfigPanel({
               }}
             >
               {t('settings.confirmReset')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Fork: every change to the organisation's list asks first. */}
+      <AlertDialog
+        open={orgConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setOrgConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {orgConfirm?.kind === 'remove'
+                ? t('settings.orgModelsRemoveTitle')
+                : orgConfirm?.kind === 'drop'
+                  ? t('settings.orgModelDeleteTitle')
+                  : t('settings.orgModelsPublishTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {orgConfirm?.kind === 'remove'
+                ? t('settings.orgModelsRemoveBody')
+                : orgConfirm?.kind === 'drop'
+                  ? t('settings.orgModelDeleteBody')
+                  : t('settings.orgModelsPublishBody')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant={orgConfirm?.kind === 'publish' ? 'default' : 'destructive'}
+              onClick={confirmOrg}
+            >
+              {t('common.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

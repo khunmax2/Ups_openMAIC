@@ -49,6 +49,13 @@ import {
   withHidden,
   type HiddenBuiltInModels,
 } from '@/lib/store/hidden-builtin-models';
+import {
+  orgDefaultFor,
+  newerCatalog,
+  personalBuiltIns,
+  withOrgModels,
+  type OrgCatalogAnswer,
+} from '@/lib/credentials/org-models';
 import { isTTSProviderEnabled } from '@/lib/audio/provider-enablement';
 import { apiPath } from '@/lib/base-path';
 
@@ -249,6 +256,11 @@ export interface SettingsState {
   // Fork: built-in models removed from a provider's list stay removed
   // (lib/store/hidden-builtin-models.ts).
   hiddenBuiltInModels: HiddenBuiltInModels;
+  // Fork: the organisation's model catalog as last answered by the server,
+  // and whether this account picked its model itself -- until it does, the
+  // organisation's default applies (lib/credentials/org-models.ts).
+  orgModelCatalog: OrgCatalogAnswer | null;
+  llmModelIsUserSet: boolean;
 
   // Global TTS/ASR toggles
   ttsEnabled: boolean;
@@ -794,6 +806,55 @@ function builtInModelIds(providerId: string): string[] {
   return (PROVIDERS[providerId as ProviderId]?.models ?? []).map((m) => m.id);
 }
 
+type OrgCatalogFields = Pick<
+  SettingsState,
+  | 'providersConfig'
+  | 'hiddenBuiltInModels'
+  | 'orgModelCatalog'
+  | 'llmModelIsUserSet'
+  | 'providerId'
+  | 'modelId'
+>;
+
+/**
+ * Fork. The organisation's model catalog applied to a settings state
+ * (lib/credentials/org-models.ts): each built-in provider's list rebuilt from
+ * the registry with the organisation's hidden and added models and the
+ * person's own, then the organisation's default model for an account that has
+ * not picked its own. A provider whose models the operator pinned in env is
+ * left to that pin. Used on every rehydrate and whenever the server answers.
+ */
+export function applyOrgCatalog(
+  state: OrgCatalogFields,
+): Pick<SettingsState, 'providersConfig'> & Partial<Pick<SettingsState, 'providerId' | 'modelId'>> {
+  const org = state.orgModelCatalog ?? undefined;
+  const providersConfig = { ...state.providersConfig };
+  for (const [pid, provider] of Object.entries(PROVIDERS)) {
+    const config = providersConfig[pid as ProviderId];
+    if (!config || config.serverModels?.length) continue;
+    providersConfig[pid as ProviderId] = {
+      ...config,
+      models: withOrgModels(
+        provider.models,
+        config.models ?? [],
+        org?.models[pid],
+        state.hiddenBuiltInModels?.[pid],
+      ),
+    };
+  }
+  const selection = orgDefaultFor(
+    { llmModelIsUserSet: state.llmModelIsUserSet, providersConfig },
+    org,
+  );
+  return {
+    providersConfig,
+    ...(selection && selection.providerId !== state.providerId
+      ? { providerId: selection.providerId as ProviderId }
+      : {}),
+    ...(selection && selection.modelId !== state.modelId ? { modelId: selection.modelId } : {}),
+  };
+}
+
 function ensureBuiltInProviders(state: Partial<SettingsState>): void {
   if (!state.providersConfig) return;
   const defaultConfig = getDefaultProvidersConfig();
@@ -970,6 +1031,8 @@ export const useSettingsStore = create<SettingsState>()(
         credentialMeta: {},
         credentialDefaults: {},
         hiddenBuiltInModels: {},
+        orgModelCatalog: null,
+        llmModelIsUserSet: false,
         ttsModel: 'openai-tts',
         selectedAgentIds: ['default-1', 'default-2', 'default-3'],
         agentMode: 'auto' as const,
@@ -1025,7 +1088,9 @@ export const useSettingsStore = create<SettingsState>()(
         ...defaultWebSearchConfig,
 
         // Actions
-        setModel: (providerId, modelId) => set({ providerId, modelId }),
+        // Fork: the picker is the only caller, so a pick here is the person's own
+        // -- the organisation's default no longer applies to this account.
+        setModel: (providerId, modelId) => set({ providerId, modelId, llmModelIsUserSet: true }),
 
         setThinkingConfig: (providerId, modelId, config) =>
           set((state) => {
@@ -1070,7 +1135,14 @@ export const useSettingsStore = create<SettingsState>()(
                 hiddenBuiltInModels: withHidden(
                   state.hiddenBuiltInModels,
                   providerId,
-                  hiddenAfterEdit(builtInModelIds(providerId), config.models),
+                  hiddenAfterEdit(
+                    // What the organisation hides is its own, not this person's.
+                    personalBuiltIns(
+                      builtInModelIds(providerId),
+                      state.orgModelCatalog?.models[providerId],
+                    ),
+                    config.models,
+                  ),
                 ),
               }),
             };
@@ -1092,7 +1164,10 @@ export const useSettingsStore = create<SettingsState>()(
               ...(nextProvider !== state.providerId && { providerId: nextProvider }),
               ...(nextModel !== state.modelId && { modelId: nextModel }),
               // Fork: the same rule as setProviderConfig, for every provider.
-              hiddenBuiltInModels: hiddenAfterBulkEdit(builtInModelIds, config),
+              hiddenBuiltInModels: hiddenAfterBulkEdit(
+                (pid) => personalBuiltIns(builtInModelIds(pid), state.orgModelCatalog?.models[pid]),
+                config,
+              ),
             };
           }),
 
@@ -2327,6 +2402,14 @@ export const useSettingsStore = create<SettingsState>()(
         delete persisted.editInsertToolbarCollapsed;
         const merged = { ...currentState, ...persisted };
         ensureBuiltInProviders(merged as Partial<SettingsState>);
+        // Fork: the organisation's model catalog. The copy saved with the
+        // settings may come from any tab of the account, one opened before the
+        // last change included, so the later read wins, not the later write.
+        merged.orgModelCatalog = newerCatalog(
+          currentState.orgModelCatalog,
+          persisted.orgModelCatalog as OrgCatalogAnswer | null | undefined,
+        );
+        Object.assign(merged, applyOrgCatalog(merged as SettingsState));
         promoteLegacyCustomProviderBaseUrls(merged as Partial<SettingsState>);
         ensureBuiltInAudioProviders(merged as Partial<SettingsState>);
         ensureBuiltInImageProviders(merged as Partial<SettingsState>);

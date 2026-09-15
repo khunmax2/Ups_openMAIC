@@ -647,6 +647,62 @@ upstream's `HttpKVStore` with the guard driven through a mid-session account
 switch), `tests/store/account-kv-owner-guard.test.ts`,
 `tests/store/hidden-builtin-models.test.ts` (a store-level rehydrate).
 
+### An administrator sets the organisation's model list, and every account starts from it
+
+The same report asked whether the model list should live in configuration
+rather than in each account's settings (2026-09-15). A model one admin added
+reached nobody else, and every new account started from upstream's registry
+list and its default model. Now an admin publishes a built-in provider's list,
+and a default model, for the whole organisation from Settings; the server
+keeps them and every account applies them.
+
+- `studio_org_setting` holds one row per built-in LLM provider
+  (`llm-models:<id>`: the registry models to hide and the models to add) and
+  one for the default model (`llm-default`), each with the account that wrote
+  it and when (`lib/server/org/store.ts`).
+- `PUT`/`DELETE /api/studio/org/llm-models/{providerId}` and
+  `/api/studio/org/llm-default` write them (`lib/server/org/routes.ts`). Any
+  admin may, the same rule as sharing a key; anyone else gets 403. A model
+  keeps only its id, name, context and output windows and three capability
+  flags, so nothing else a client sends is stored. Each change is logged as
+  `[OrgCatalog]` with who made it.
+- Every account receives the catalog with its credentials, as `org` in the
+  list answer; only an admin is told which account last changed each part
+  (`lib/server/org/answer.ts`).
+- The settings store applies it on every credentials load and every rehydrate
+  (`applyOrgCatalog` in `lib/store/settings.ts`, the rules in
+  `lib/credentials/org-models.ts`). A provider's list becomes the registry
+  models, less those the organisation hides and those the account removed,
+  then the organisation's models (marked `fromOrg`), then the account's own.
+  A model the account had added itself and the organisation also lists keeps
+  that fact (`ownCopy`), so when the organisation drops the model the account
+  keeps it. The first cut let it vanish; found in a browser before merge.
+  A provider whose models the operator pins (`serverModels`) is left alone.
+- The organisation's default model is selected until the account picks a
+  model itself (`llmModelIsUserSet`, set only by the picker), and only while
+  that provider is usable for the account.
+- The catalog is saved with each account's settings, and any tab of the
+  account may save them, one opened before the last change included. So each
+  answer carries `servedAt`, and a tab keeps whichever copy was read later,
+  its own or the saved one (`newerCatalog`). Letting the saved copy win, as
+  the first cut did, took a newly added model away from a fresh tab as soon
+  as an older tab saved; found in a browser before merge. An open tab sees a
+  change on its next load, or when a newer tab of the account saves.
+- In the provider panel an admin publishes the list as it stands, updates or
+  removes it, stars the default, and brings a hidden registry model back.
+  While a list is published, an admin's delete of a registry or organisation
+  model asks first and changes the organisation's list. An organisation model
+  carries a badge and is edited by nobody in place; other accounts get no
+  delete on it (`components/settings/provider-config-panel.tsx`, 19
+  `settings.org*` keys in all 13 locales).
+
+Tests: `tests/credentials/org-models.test.ts` (the list and default rules),
+`tests/server/org-catalog.test.ts` (admin-only writes, what is kept, who is
+told what, the log), `tests/store/org-model-catalog-store.test.ts` (the real
+store: a new account and a reload, a model the person picked, and a tab
+coming back after an older or a newer tab saved). All three were red before
+the change.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

@@ -156,6 +156,16 @@ export interface ModelInfo {
    * ids. Catalog and manually-added models leave this unset and are preserved.
    */
   source?: 'probed' | 'manual';
+  /**
+   * Fork. The organisation's catalog put this model in every account's list
+   * (lib/credentials/org-models.ts); the page shows it as the organisation's.
+   */
+  fromOrg?: boolean;
+  /**
+   * Fork. The account had added this model itself before the organisation
+   * listed it, so it stays the account's when the organisation drops it.
+   */
+  ownCopy?: boolean;
 }
 
 /**
