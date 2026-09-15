@@ -32,7 +32,9 @@
  */
 
 import { apiPath } from '@/lib/base-path';
-import { useSettingsStore, type SettingsState } from '@/lib/store/settings';
+import { applyOrgCatalog, useSettingsStore, type SettingsState } from '@/lib/store/settings';
+
+import type { OrgCatalogAnswer } from './org-models';
 
 export const CREDENTIAL_SENTINEL = '***';
 
@@ -166,6 +168,8 @@ interface ListResponse {
   storage: 'server' | 'none';
   own: Partial<Record<CredentialSection, Record<string, { masked: string; baseUrl: string }>>>;
   defaults: Partial<Record<CredentialSection, Record<string, SharedRow>>>;
+  /** Fork: the organisation's model catalog (lib/credentials/org-models.ts). */
+  org?: OrgCatalogAnswer;
 }
 
 async function listFromServer(): Promise<ListResponse | undefined> {
@@ -419,6 +423,7 @@ function applyMeta(
   meta: CredentialMeta,
   role: 'admin' | 'user',
   defaults: SettingsState['credentialDefaults'],
+  org: OrgCatalogAnswer | undefined,
 ) {
   applying = true;
   try {
@@ -440,6 +445,10 @@ function applyMeta(
           selectedKey ? String(state[selectedKey] ?? '') : undefined,
         );
       }
+      // Fork: the organisation's model catalog, applied over the lists the
+      // credentials just shaped (lib/credentials/org-models.ts).
+      patch.orgModelCatalog = org ?? null;
+      Object.assign(patch, applyOrgCatalog({ ...state, ...patch } as SettingsState));
       return patch;
     });
   } finally {
@@ -597,7 +606,7 @@ export async function startCredentialSync(): Promise<void> {
   }
   const meta = await backfillEndpoints(await migrateStoredKeys(metaFrom(list)));
   await backfillSharedProfiles(list);
-  applyMeta(meta, list.role, defaultsFrom(list));
+  applyMeta(meta, list.role, defaultsFrom(list), list.org);
   watchStore();
 }
 
@@ -605,7 +614,7 @@ export async function startCredentialSync(): Promise<void> {
 export async function refreshCredentials(): Promise<void> {
   const list = await listFromServer();
   if (!list || list.storage !== 'server') return;
-  applyMeta(metaFrom(list), list.role, defaultsFrom(list));
+  applyMeta(metaFrom(list), list.role, defaultsFrom(list), list.org);
 }
 
 /** Test seam. */

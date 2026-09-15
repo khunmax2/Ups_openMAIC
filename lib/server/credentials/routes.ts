@@ -13,6 +13,8 @@
  */
 
 import { createLogger } from '@/lib/logger';
+import { orgForViewer } from '@/lib/server/org/answer';
+import { readOrgCatalog } from '@/lib/server/org/store';
 import { readVerifiedOrAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import {
@@ -50,7 +52,7 @@ function jsonError(status: number, code: string, message: string): Response {
 }
 
 /** The identity the gateway set, or -- only without a gateway -- the anonymous cookie. */
-function ownerOf(request: Request): string | Response {
+export function ownerOf(request: Request): string | Response {
   const owner = readVerifiedOrAnonymousOwnerId(request.headers);
   if (owner) return owner;
   if (studioGatewayRequired()) return refuseWithoutStudioIdentity();
@@ -123,11 +125,18 @@ export async function handleList(request: Request): Promise<Response> {
           ...(row.updatedAt ? { sharedAt: row.updatedAt } : {}),
         })
       : undefined;
+  // Fork: the organisation's model catalog travels with the credentials, so
+  // every account applies it when its page boots (lib/server/org/store.ts).
+  // A failure to read it must not cost anyone their keys.
+  const org = await readOrgCatalog(store)
+    .then((catalog) => orgForViewer(catalog, role, owner))
+    .catch(() => ({ models: {} }));
   return json(200, {
     role,
     storage: 'server',
     own: maskSet(set.own),
     defaults: maskSet(set.defaults, sharer),
+    org,
   });
 }
 
