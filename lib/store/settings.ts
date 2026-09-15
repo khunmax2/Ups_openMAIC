@@ -229,7 +229,15 @@ export interface SettingsState {
   /** The default rows alone, so an admin can see whether their own key already is one. */
   credentialDefaults: Record<
     string,
-    { masked: string; baseUrl: string; profile?: Record<string, unknown> }
+    {
+      masked: string;
+      baseUrl: string;
+      profile?: Record<string, unknown>;
+      // Fork: who shared it and when -- answered to admins only (lib/credentials/share-audit.ts).
+      sharedAt?: number;
+      sharedByYou?: boolean;
+      sharedBy?: string;
+    }
   >;
 
   // Global TTS/ASR toggles

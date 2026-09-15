@@ -135,7 +135,15 @@ type Entry = Fields & { customDefaultBaseUrl?: string; fromShare?: boolean };
 /** What PUT accepts: the fields, an admin's request to copy their own row, a profile. */
 export type CredentialPatch = Fields & { copyFromOwner?: boolean; profile?: ProviderProfile };
 
-type SharedRow = { masked: string; baseUrl: string; profile?: ProviderProfile };
+type SharedRow = {
+  masked: string;
+  baseUrl: string;
+  profile?: ProviderProfile;
+  // Fork: who shared it and when -- answered to admins only (lib/credentials/share-audit.ts).
+  sharedAt?: number;
+  sharedByYou?: boolean;
+  sharedBy?: string;
+};
 
 /**
  * The endpoint this entry's key is used with -- the same URL the page sends
