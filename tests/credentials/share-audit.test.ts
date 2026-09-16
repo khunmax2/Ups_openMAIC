@@ -65,14 +65,20 @@ describe('describeSharer', () => {
       'apiKeySharedByYou',
       'apiKeySharedByOther',
       'apiKeySharedByUnknown',
-      'apiKeyShareReplace',
-      'apiKeyShareReplaceHint',
       'apiKeyReplaceTitle',
       'apiKeyReplaceBody',
       'apiKeyReplaceConfirm',
       'apiKeyStopTitle',
       'apiKeyStopBody',
       'apiKeyStopConfirm',
+      // The one-button organisation setup on the key's row (2026-09-17).
+      'orgSetupPublish',
+      'orgSetupUpdate',
+      'orgSetupWithdraw',
+      'orgSetupWithdrawAlso',
+      'orgSetupNeedsKey',
+      'apiKeyRemoveSharedTitle',
+      'apiKeyRemoveSharedBody',
     ];
     for (const locale of ['en-US', 'th-TH']) {
       const settings = JSON.parse(readFileSync(`lib/i18n/locales/${locale}.json`, 'utf8')).settings;

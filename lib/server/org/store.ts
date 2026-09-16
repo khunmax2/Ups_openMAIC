@@ -142,3 +142,21 @@ export async function deleteOrgSetting(queryable: Queryable, key: string): Promi
   );
   return result.rows.length > 0;
 }
+
+/**
+ * Withdraws a provider's organisation list and, when it points at that
+ * provider, the default model. What the one "use this for every account"
+ * button set, the key's removal takes away again (decided 2026-09-17), so
+ * nothing is left half published. Returns what went.
+ */
+export async function withdrawProviderCatalog(
+  queryable: Queryable,
+  providerId: string,
+): Promise<{ models: boolean; defaultModel: OrgDefaultModel | null }> {
+  const catalog = await readOrgCatalog(queryable);
+  const models = await deleteOrgSetting(queryable, orgModelsKey(providerId));
+  const current = catalog.defaultModel?.value ?? null;
+  const defaultModel = current?.providerId === providerId ? current : null;
+  if (defaultModel) await deleteOrgSetting(queryable, ORG_DEFAULT_KEY);
+  return { models, defaultModel };
+}

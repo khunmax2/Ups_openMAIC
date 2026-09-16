@@ -719,6 +719,38 @@ store: a new account and a reload, a model the person picked, and a tab
 coming back after an older or a newer tab saved). All three were red before
 the change.
 
+### One button uses a provider for every account
+
+The key row's share menu ("share this key with every account", "stop
+sharing") and the model list's own bar ("use this list for every account")
+were two ways of saying one thing, and a provider could end up half done: a
+list published with no key behind it, or a key shared with no list. Decided
+2026-09-17: one action, on the key's row, in every section.
+
+- **"Use for every account"** shares the admin's key -- with the provider's
+  definition when it is a custom one, as before -- and, for a built-in LLM
+  provider, publishes the organisation's model list in the same click
+  (`organisation` prop of `components/settings/api-key-field.tsx`, filled by
+  `provider-config-panel.tsx`). It needs a key of the admin's own; the button
+  says so otherwise. Sharing over another admin's key still asks first.
+- **"Update every account from this key"** does both again; **"stop using
+  for every account"** removes the shared key, and the server withdraws the
+  provider's list and default model with it (`withdrawProviderCatalog`,
+  `lib/server/org/store.ts`, called from the credentials delete route).
+- **Removing the key** (the bin on the row) withdraws the same when the shared
+  key was copied from it; the dialog says so. Another admin's own key going
+  leaves the share alone.
+- The badge on a provider's entry now reads "organisation" (one word for the
+  key, the list and the default), and the model list's own bar, stamp and
+  hidden chips are gone. For sections without a model list (TTS, ASR, image,
+  video, PDF, web search) the button shares the key and definition only, as
+  the menu did.
+
+Tests: `tests/server/org-catalog.test.ts` ("withdrawing the shared key":
+the shared row removed, the sharer's own row removed, another admin's own row
+removed -- red before the change) and `tests/credentials/share-audit.test.ts`
+(the keys the row uses).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,
