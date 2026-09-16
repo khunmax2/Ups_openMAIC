@@ -24,15 +24,15 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/hooks/use-i18n';
-import { resolveASRProviderName } from '@/lib/audio/provider-display';
+import { resolveASRProviderName, resolveTTSProviderName } from '@/lib/audio/provider-display';
 import { useSettingsStore } from '@/lib/store/settings';
 import { IMAGE_PROVIDERS } from '@/lib/media/image-providers';
 import { VIDEO_PROVIDERS } from '@/lib/media/video-providers';
 import { CUSTOM_ASR_DEFAULT_LANGUAGES } from '@/lib/audio/constants';
-import { ASR_PROVIDERS, getASRSupportedLanguages } from '@/lib/audio/constants';
+import { ASR_PROVIDERS, TTS_PROVIDERS, getASRSupportedLanguages } from '@/lib/audio/constants';
 import type { ImageProviderId, VideoProviderId } from '@/lib/media/types';
-import type { ASRProviderId } from '@/lib/audio/types';
-import { isCustomASRProvider } from '@/lib/audio/types';
+import type { ASRProviderId, TTSProviderId } from '@/lib/audio/types';
+import { isCustomASRProvider, isCustomTTSProvider } from '@/lib/audio/types';
 import type { SettingsSection } from '@/lib/types/settings';
 import { apiPath, assetPath } from '@/lib/base-path';
 
@@ -103,6 +103,14 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
   const videoProvidersConfig = useSettingsStore((s) => s.videoProvidersConfig);
   const setVideoProvider = useSettingsStore((s) => s.setVideoProvider);
   const setVideoModelId = useSettingsStore((s) => s.setVideoModelId);
+
+  // Fork: the TTS tab shows the provider and model in use, as the image tab
+  // does, and the voice under them (the user asked for it, 2026-09-17).
+  const ttsProviderId = useSettingsStore((s) => s.ttsProviderId);
+  const ttsVoice = useSettingsStore((s) => s.ttsVoice);
+  const ttsProvidersConfig = useSettingsStore((s) => s.ttsProvidersConfig);
+  const setTTSProvider = useSettingsStore((s) => s.setTTSProvider);
+  const setTTSProviderConfig = useSettingsStore((s) => s.setTTSProviderConfig);
 
   const asrProviderId = useSettingsStore((s) => s.asrProviderId);
   const asrLanguage = useSettingsStore((s) => s.asrLanguage);
@@ -227,6 +235,50 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
     return groups;
   }, [asrProvidersConfig, cfgOk, t]);
 
+  // TTS: built-in + custom providers, each with its models; a provider with
+  // no model concept lists one entry so it can still be picked.
+  const ttsGroups = useMemo(() => {
+    const groups: SelectGroupData[] = [];
+    for (const p of Object.values(TTS_PROVIDERS)) {
+      if (!cfgOk(ttsProvidersConfig, p.id, p.requiresApiKey)) continue;
+      const cfg = ttsProvidersConfig[p.id];
+      const models = providerModels(p.models, cfg);
+      const name = resolveTTSProviderName(p.id, t, p.name);
+      groups.push({
+        groupId: p.id,
+        groupName: name,
+        groupIcon: p.icon,
+        available: true,
+        items:
+          models.length > 0
+            ? models.map((m) => ({ id: m.id, name: m.name }))
+            : [
+                {
+                  id: cfg?.modelId || p.defaultModelId || 'default',
+                  name: t('media.ttsDefaultModel'),
+                },
+              ],
+      });
+    }
+    for (const [id, cfg] of Object.entries(ttsProvidersConfig)) {
+      if (!isCustomTTSProvider(id)) continue;
+      const customModels = cfg.customModels || [];
+      if (customModels.length === 0) continue;
+      groups.push({
+        groupId: id,
+        groupName: cfg.customName || id,
+        available: true,
+        items: customModels.map((m) => ({ id: m.id, name: m.name })),
+      });
+    }
+    return groups;
+  }, [cfgOk, t, ttsProvidersConfig]);
+  const ttsModelId =
+    ttsProvidersConfig[ttsProviderId]?.modelId ||
+    (isCustomTTSProvider(ttsProviderId)
+      ? ttsProvidersConfig[ttsProviderId]?.customModels?.[0]?.id || ''
+      : TTS_PROVIDERS[ttsProviderId as keyof typeof TTS_PROVIDERS]?.defaultModelId || 'default');
+
   // Auto-select first enabled tab on open
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
@@ -331,7 +383,22 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
               label={t('media.ttsCapability')}
               enabled={ttsEnabled}
               onToggle={setTTSEnabled}
-            />
+            >
+              <GroupedSelect
+                groups={ttsGroups}
+                selectedGroupId={ttsProviderId}
+                selectedItemId={ttsModelId}
+                onSelect={(gid, iid) => {
+                  setTTSProvider(gid as TTSProviderId);
+                  setTTSProviderConfig(gid as TTSProviderId, { modelId: iid });
+                }}
+              />
+              {ttsVoice && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t('media.ttsVoice', { voice: ttsVoice })}
+                </p>
+              )}
+            </TabPanel>
           )}
 
           {activeTab === 'asr' && (

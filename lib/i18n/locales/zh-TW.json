@@ -2014,6 +2014,8 @@
     "videoCapability": "影片生成",
     "videoHint": "教材中生成影片",
     "ttsCapability": "語音合成",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "AI 老師語音講解",
     "asrCapability": "語音識別",
     "asrHint": "語音輸入參與討論",

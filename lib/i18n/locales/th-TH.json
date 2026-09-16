@@ -2029,6 +2029,8 @@
     "videoCapability": "สร้างวิดีโอ",
     "videoHint": "สร้างวิดีโอในสไลด์",
     "ttsCapability": "อ่านออกเสียง",
+    "ttsVoice": "เสียง: {{voice}}",
+    "ttsDefaultModel": "โมเดลเริ่มต้น",
     "ttsHint": "ครู AI พูดออกเสียง",
     "asrCapability": "รู้จำเสียงพูด",
     "asrHint": "พูดเพื่อร่วมอภิปราย",

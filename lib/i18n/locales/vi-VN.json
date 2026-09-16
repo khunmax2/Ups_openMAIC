@@ -2029,6 +2029,8 @@
     "videoCapability": "Tạo video",
     "videoHint": "Tạo video trong slide",
     "ttsCapability": "Chuyển văn bản thành giọng nói",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "Giảng viên AI đọc thành tiếng",
     "asrCapability": "Nhận dạng giọng nói",
     "asrHint": "Nhập bằng giọng nói khi thảo luận",

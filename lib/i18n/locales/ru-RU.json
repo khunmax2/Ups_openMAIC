@@ -2029,6 +2029,8 @@
     "videoCapability": "Генерация видео",
     "videoHint": "Генерация видео в слайдах",
     "ttsCapability": "Синтез речи",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "AI-учитель говорит вслух",
     "asrCapability": "Распознавание речи",
     "asrHint": "Голосовой ввод для обсуждения",

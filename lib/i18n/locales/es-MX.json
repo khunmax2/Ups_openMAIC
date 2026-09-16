@@ -2029,6 +2029,8 @@
     "videoCapability": "Generación de video",
     "videoHint": "Genera videos en las diapositivas",
     "ttsCapability": "Texto a voz",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "El maestro IA habla en voz alta",
     "asrCapability": "Reconocimiento de voz",
     "asrHint": "Entrada de voz para la discusión",

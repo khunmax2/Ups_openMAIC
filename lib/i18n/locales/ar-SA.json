@@ -2029,6 +2029,8 @@
     "videoCapability": "توليد الفيديو",
     "videoHint": "توليد فيديوهات في الشرائح",
     "ttsCapability": "تحويل النص إلى كلام",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "المعلم الذكي يتحدث بصوت مسموع",
     "asrCapability": "التعرف على الكلام",
     "asrHint": "إدخال صوتي للنقاش",

@@ -2029,6 +2029,8 @@
     "videoCapability": "動画生成",
     "videoHint": "スライドに動画を生成",
     "ttsCapability": "音声合成",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "AI教師が声で話します",
     "asrCapability": "音声認識",
     "asrHint": "ディスカッションで音声入力",

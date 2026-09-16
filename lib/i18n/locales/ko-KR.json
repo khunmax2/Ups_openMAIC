@@ -2029,6 +2029,8 @@
     "videoCapability": "동영상 생성",
     "videoHint": "슬라이드에 동영상을 생성합니다",
     "ttsCapability": "텍스트 음성 변환",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "AI 선생님이 소리 내어 읽습니다",
     "asrCapability": "음성 인식",
     "asrHint": "토론을 위한 음성 입력",
