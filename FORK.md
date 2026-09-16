@@ -703,10 +703,18 @@ keeps them and every account applies them.
   read as a bug on the host (2026-09-16): the model the admin had just added
   had no star, and nothing said that publishing the list was the step that
   gives it one.
+- The default can be given up (the un-star button on its row), a second star
+  asks before moving it and says the current one stays in the list, and the
+  server drops the default by itself when a list change hides or removes its
+  model or removes the list (`clearDefaultLeftBehind`), so re-adding the
+  model does not bring the star back. The chips that listed the registry
+  models an organisation hides are gone: leaving a model out of the list is
+  the intent, and Reset followed by "update the organisation's list" brings a
+  built-in back. (Four items from the user's 2026-09-17 notes.)
 
 Tests: `tests/credentials/org-models.test.ts` (the list, default and star rules),
 `tests/server/org-catalog.test.ts` (admin-only writes, what is kept, who is
-told what, the log), `tests/store/org-model-catalog-store.test.ts` (the real
+told what, the log, the default dropped with its model), `tests/store/org-model-catalog-store.test.ts` (the real
 store: a new account and a reload, a model the person picked, and a tab
 coming back after an older or a newer tab saved). All three were red before
 the change.

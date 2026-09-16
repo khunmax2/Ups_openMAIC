@@ -31,8 +31,8 @@ import {
   Send,
   Download,
   Building2,
-  Eye,
   Star,
+  StarOff,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { PROVIDERS, type ProviderConfig, type ProviderId } from '@/lib/ai/providers';
@@ -225,7 +225,11 @@ export function ProviderConfigPanel({
   const canCurate =
     serverBacked && role === 'admin' && isBuiltIn && !modelsLocked && registry.length > 0;
   const [orgConfirm, setOrgConfirm] = useState<
-    { kind: 'publish' } | { kind: 'remove' } | { kind: 'drop'; modelId: string } | null
+    | { kind: 'publish' }
+    | { kind: 'remove' }
+    | { kind: 'drop'; modelId: string }
+    | { kind: 'default'; modelId: string }
+    | null
   >(null);
   const [orgBusy, setOrgBusy] = useState(false);
 
@@ -248,6 +252,16 @@ export function ProviderConfigPanel({
     orgRequest('PUT', `llm-models/${provider.id}`, { hidden, extra });
   const isOrgDefault = (modelId: string) =>
     orgDefault?.providerId === provider.id && orgDefault.modelId === modelId;
+  const modelLabel = (providerId: string, modelId: string) => {
+    const providerName = PROVIDERS[providerId as ProviderId]?.name ?? providerId;
+    const modelName =
+      providerId === provider.id
+        ? (models.find((m) => m.id === modelId)?.name ?? modelId)
+        : modelId;
+    return `${providerName} / ${modelName}`;
+  };
+  const setOrgDefault = (modelId: string) =>
+    orgRequest('PUT', 'llm-default', { providerId: provider.id, modelId });
   const orgStamp = (() => {
     if (!orgHere?.updatedAt) return '';
     const time = new Date(orgHere.updatedAt).toLocaleString(locale, {
@@ -278,6 +292,8 @@ export function ProviderConfigPanel({
       void orgRequest('PUT', `llm-models/${provider.id}`, catalogFromList(registry, models));
     } else if (pending.kind === 'remove') {
       void orgRequest('DELETE', `llm-models/${provider.id}`);
+    } else if (pending.kind === 'default') {
+      void setOrgDefault(pending.modelId);
     } else if (orgHere) {
       void (builtInIds.has(pending.modelId)
         ? putOrgModels([...new Set([...orgHere.hidden, pending.modelId])], orgHere.extra)
@@ -558,29 +574,6 @@ export function ProviderConfigPanel({
                 {t('settings.orgDefaultHint')}
               </div>
             )}
-            {orgHere && orgHere.hidden.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <span>{t('settings.orgModelsHidden')}</span>
-                {orgHere.hidden.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    disabled={orgBusy}
-                    title={t('settings.orgModelsShowAgain')}
-                    onClick={() =>
-                      void putOrgModels(
-                        orgHere.hidden.filter((hidden) => hidden !== id),
-                        orgHere.extra,
-                      )
-                    }
-                    className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 hover:bg-muted"
-                  >
-                    <Eye className="h-3 w-3" />
-                    {registry.find((m) => m.id === id)?.name ?? id}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
         {!canCurate && orgHere && (
@@ -671,16 +664,27 @@ export function ProviderConfigPanel({
                           className="h-8 px-2"
                           disabled={orgBusy}
                           onClick={() =>
-                            void orgRequest('PUT', 'llm-default', {
-                              providerId: provider.id,
-                              modelId: model.id,
-                            })
+                            orgDefault
+                              ? setOrgConfirm({ kind: 'default', modelId: model.id })
+                              : void setOrgDefault(model.id)
                           }
                           title={t('settings.orgDefaultSet')}
                         >
                           <Star className="h-3.5 w-3.5" />
                         </Button>
                       )}
+                    {canCurate && isOrgDefault(model.id) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2"
+                        disabled={orgBusy}
+                        onClick={() => void orgRequest('DELETE', 'llm-default')}
+                        title={t('settings.orgDefaultClear')}
+                      >
+                        <StarOff className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     {!model.fromOrg && (
                       <Button
                         variant="outline"
@@ -744,20 +748,31 @@ export function ProviderConfigPanel({
                 ? t('settings.orgModelsRemoveTitle')
                 : orgConfirm?.kind === 'drop'
                   ? t('settings.orgModelDeleteTitle')
-                  : t('settings.orgModelsPublishTitle')}
+                  : orgConfirm?.kind === 'default'
+                    ? t('settings.orgDefaultReplaceTitle')
+                    : t('settings.orgModelsPublishTitle')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {orgConfirm?.kind === 'remove'
                 ? t('settings.orgModelsRemoveBody')
                 : orgConfirm?.kind === 'drop'
                   ? t('settings.orgModelDeleteBody')
-                  : t('settings.orgModelsPublishBody')}
+                  : orgConfirm?.kind === 'default' && orgDefault
+                    ? t('settings.orgDefaultReplaceBody', {
+                        current: modelLabel(orgDefault.providerId, orgDefault.modelId),
+                        next: modelLabel(provider.id, orgConfirm.modelId),
+                      })
+                    : t('settings.orgModelsPublishBody')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
-              variant={orgConfirm?.kind === 'publish' ? 'default' : 'destructive'}
+              variant={
+                orgConfirm?.kind === 'publish' || orgConfirm?.kind === 'default'
+                  ? 'default'
+                  : 'destructive'
+              }
               onClick={confirmOrg}
             >
               {t('common.confirm')}

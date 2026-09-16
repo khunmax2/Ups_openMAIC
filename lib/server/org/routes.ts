@@ -12,6 +12,7 @@
  * 2026-09-15); who wrote it is recorded, shown to admins, and logged.
  */
 
+import { PROVIDERS, type ProviderId } from '@/lib/ai/providers';
 import { createLogger } from '@/lib/logger';
 import { ownerOf } from '@/lib/server/credentials/routes';
 import { credentialStore } from '@/lib/server/credentials/context';
@@ -21,6 +22,7 @@ import {
   deleteOrgSetting,
   ORG_DEFAULT_KEY,
   orgModelsKey,
+  readOrgCatalog,
   writeOrgSetting,
   type OrgDefaultModel,
   type OrgModel,
@@ -132,6 +134,29 @@ function parseAddress(segments: string[]): Address | Response {
   return jsonError(404, 'ROUTE_NOT_FOUND', 'expected /llm-models/{providerId} or /llm-default');
 }
 
+/**
+ * The organisation's default model only means something while the provider's
+ * list offers it. When a change to that list hides it, drops it, or removes
+ * the list, the default goes with it, so nothing keeps pointing at a model
+ * nobody is offered and re-adding the model does not bring the star back
+ * (report 2026-09-16).
+ */
+async function clearDefaultLeftBehind(
+  store: Parameters<typeof readOrgCatalog>[0],
+  providerId: string,
+  offered: (modelId: string) => boolean,
+): Promise<void> {
+  const current = (await readOrgCatalog(store)).defaultModel?.value;
+  if (!current || current.providerId !== providerId || offered(current.modelId)) return;
+  await deleteOrgSetting(store, ORG_DEFAULT_KEY);
+  log.info(
+    `Cleared the organisation's default model: ${current.providerId}/${current.modelId} left the ${providerId} models`,
+  );
+}
+
+const builtInIds = (providerId: string): Set<string> =>
+  new Set((PROVIDERS[providerId as ProviderId]?.models ?? []).map((model) => model.id));
+
 export async function handleOrgWrite(request: Request, segments: string[]): Promise<Response> {
   const owner = ownerOf(request);
   if (owner instanceof Response) return owner;
@@ -152,6 +177,9 @@ export async function handleOrgWrite(request: Request, segments: string[]): Prom
   if (request.method === 'DELETE') {
     const removed = await deleteOrgSetting(store, address.key);
     if (removed) log.info(`Removed the organisation's ${what}: by ${owner}`);
+    if (removed && address.kind === 'models') {
+      await clearDefaultLeftBehind(store, address.providerId, () => false);
+    }
     return json(200, { removed });
   }
   if (request.method !== 'PUT') return jsonError(405, 'INVALID_REQUEST', 'PUT or DELETE');
@@ -166,5 +194,15 @@ export async function handleOrgWrite(request: Request, segments: string[]): Prom
       ? `Set the organisation's ${what}: by ${owner} (hides ${value.hidden.length}, adds ${value.extra.length})`
       : `Set the organisation's default model to ${value.providerId}/${value.modelId}: by ${owner}`,
   );
+  if (address.kind === 'models' && 'extra' in value) {
+    const registry = builtInIds(address.providerId);
+    const hidden = new Set(value.hidden);
+    const added = new Set(value.extra.map((model) => model.id));
+    await clearDefaultLeftBehind(
+      store,
+      address.providerId,
+      (modelId) => !hidden.has(modelId) && (added.has(modelId) || registry.has(modelId)),
+    );
+  }
   return json(200, { stored: value });
 }
