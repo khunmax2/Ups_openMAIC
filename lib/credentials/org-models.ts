@@ -187,3 +187,20 @@ export function catalogFromList(
       })),
   };
 }
+
+/**
+ * Whether a model's row offers the star that makes it the organisation's
+ * default. Only once the organisation has a list for the provider, and only
+ * on the rows that list holds -- the registry's built-ins and the
+ * organisation's additions -- never on a person's own addition, which other
+ * accounts do not have. The current default carries a badge instead.
+ * (Decided 2026-09-16: a star on some rows and not others, before anything
+ * was published, read as a bug.)
+ */
+export function offersOrgDefault(
+  model: { id: string; fromOrg?: boolean },
+  ctx: { published: boolean; builtInIds: ReadonlySet<string>; defaultModelId?: string },
+): boolean {
+  if (!ctx.published || ctx.defaultModelId === model.id) return false;
+  return ctx.builtInIds.has(model.id) || !!model.fromOrg;
+}

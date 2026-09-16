@@ -1430,6 +1430,7 @@
     "orgModelBadge": "Organisation",
     "orgDefaultBadge": "Organisation's default",
     "orgDefaultSet": "Make this the organisation's default model",
+    "orgDefaultHint": "Press the star on a model to make it the organisation's default.",
     "orgModelDeleteTitle": "Remove this model from every account's list?",
     "orgModelDeleteBody": "It disappears from the list of every account that did not add it too; to offer it to everyone again, add it back to the organisation's list.",
     "enterCustomBaseUrl": "Enter custom Base URL",
