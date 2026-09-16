@@ -332,6 +332,8 @@ async function callImageApi(
       'x-image-model': settings.imageModelId || '',
       'x-api-key': providerConfig?.apiKey || '',
       'x-base-url': providerConfig?.baseUrl || '',
+      // Fork: the quality level the provider's settings name, if any.
+      ...(providerConfig?.quality ? { 'x-image-quality': providerConfig.quality } : {}),
     },
     body: JSON.stringify({
       prompt: req.prompt,

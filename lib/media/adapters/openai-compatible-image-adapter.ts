@@ -140,6 +140,7 @@ export async function generateWithOpenAICompatibleImage(
       prompt: options.prompt,
       n: 1,
       size: `${width}x${height}`,
+      ...(config.quality ? { quality: config.quality } : {}),
     }),
   });
 

@@ -138,6 +138,12 @@ export interface ImageGenerationConfig {
   baseUrl?: string;
   /** Optional model ID override (uses provider default if omitted) */
   model?: string;
+  /**
+   * Fork. A quality level for an OpenAI-compatible server (`low` | `high`,
+   * OpenAI's `quality` field), sent only when the provider's settings name
+   * one; unset leaves the server at its own default.
+   */
+  quality?: 'low' | 'high';
 }
 
 /**

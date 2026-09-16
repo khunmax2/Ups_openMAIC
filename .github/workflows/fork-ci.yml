@@ -99,3 +99,5 @@ jobs:
           tests/credentials/org-models.test.ts
           tests/server/org-catalog.test.ts
           tests/store/org-model-catalog-store.test.ts
+          tests/server/generate-image-quality.test.ts
+          tests/media/openai-compatible-image-adapter.test.ts

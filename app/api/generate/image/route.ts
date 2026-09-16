@@ -10,6 +10,7 @@
  *   x-image-provider: ImageProviderId (optional, server-configured default)
  *   x-api-key: string (optional, server fallback)
  *   x-base-url: string (optional, server fallback)
+ *   x-image-quality: low | high (optional; fork, OpenAI-compatible servers only)
  *
  * Body: { prompt, negativePrompt?, width?, height?, aspectRatio?, style? }
  * Response: { success: boolean, result?: ImageGenerationResult, error?: string }
@@ -67,6 +68,10 @@ async function handlePost(request: NextRequest) {
     const clientApiKey = managed ? undefined : request.headers.get('x-api-key') || undefined;
     const clientBaseUrl = managed ? undefined : request.headers.get('x-base-url') || undefined;
     const clientModel = request.headers.get('x-image-model')?.trim() || undefined;
+    // Fork: a quality level is a request parameter, not a secret, so a
+    // managed provider takes it too. Anything but the two levels is ignored.
+    const qualityHeader = request.headers.get('x-image-quality')?.trim();
+    const quality = qualityHeader === 'low' || qualityHeader === 'high' ? qualityHeader : undefined;
 
     if (clientBaseUrl) {
       const ssrfError = await validateUrlForSSRF(clientBaseUrl);
@@ -109,7 +114,23 @@ async function handlePost(request: NextRequest) {
         `prompt="${sizedOptions.prompt.slice(0, 80)}...", size=${sizedOptions.width ?? 'auto'}x${sizedOptions.height ?? 'auto'}`,
     );
 
-    const result = await generateImage({ providerId, apiKey, baseUrl, model }, sizedOptions);
+    // Fork: how long each image takes is the number the user asked for
+    // (2026-09-17: images trail the text), so every attempt is timed.
+    const startedAt = Date.now();
+    const describe = () =>
+      `provider=${providerId} model=${model || 'default'} size=${sizedOptions.width ?? 'auto'}x${sizedOptions.height ?? 'auto'}` +
+      `${quality ? ` quality=${quality}` : ''}`;
+    let result;
+    try {
+      result = await generateImage(
+        { providerId, apiKey, baseUrl, model, ...(quality ? { quality } : {}) },
+        sizedOptions,
+      );
+    } catch (error) {
+      log.warn(`Image failed after ${Date.now() - startedAt} ms: ${describe()}`);
+      throw error;
+    }
+    log.info(`Image took ${Date.now() - startedAt} ms: ${describe()}`);
 
     void recordGenerationUsage({
       kind: 'image',

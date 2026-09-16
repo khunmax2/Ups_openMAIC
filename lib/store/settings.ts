@@ -192,6 +192,8 @@ export interface SettingsState {
       serverDisabled?: boolean;
       customModels?: Array<{ id: string; name: string }>;
       replaceBuiltInModels?: boolean;
+      /** Fork: the quality level an OpenAI-compatible image server is asked for. */
+      quality?: 'low' | 'high';
     }
   >;
 
@@ -409,6 +411,7 @@ export interface SettingsState {
       enabled: boolean;
       customModels: Array<{ id: string; name: string }>;
       replaceBuiltInModels: boolean;
+      quality: 'low' | 'high' | undefined;
     }>,
   ) => void;
 

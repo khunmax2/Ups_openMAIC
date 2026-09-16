@@ -297,6 +297,32 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
               );
             })()}
           </div>
+
+          {/* Fork: the quality level an OpenAI-compatible image server is asked
+              for (OpenAI's `quality`); unset leaves the server at its default. */}
+          {selectedProviderId === 'custom-image' && (
+            <div className="space-y-2">
+              <Label>{t('settings.imageQuality')}</Label>
+              <select
+                name={`image-quality-${selectedProviderId}`}
+                value={currentConfig?.quality ?? ''}
+                onChange={(e) =>
+                  setImageProviderConfig(selectedProviderId, {
+                    quality:
+                      e.target.value === 'low' || e.target.value === 'high'
+                        ? e.target.value
+                        : undefined,
+                  })
+                }
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+              >
+                <option value="">{t('settings.imageQualityDefault')}</option>
+                <option value="low">{t('settings.imageQualityLow')}</option>
+                <option value="high">{t('settings.imageQualityHigh')}</option>
+              </select>
+              <p className="text-xs text-muted-foreground">{t('settings.imageQualityHint')}</p>
+            </div>
+          )}
         </>
       )}
 
