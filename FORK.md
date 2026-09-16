@@ -763,6 +763,30 @@ Picking a model sets the provider and its model the way the settings dialog
 does, so the voice rules from "a custom TTS provider is only sent a voice it
 lists" still apply.
 
+### An image's quality level can be chosen, and every image is timed
+
+A course's images arrive after its text. The studio sends the image server
+`model`, `prompt`, `n` and `size` and nothing else, so an OpenAI-compatible
+server runs at its own default level (the user's runs 8 steps: 7.7 s for a
+1024×576 image, against 4.4 s at `low` and 61 s at `high`), two images at a
+time, and logged nothing about how long each took (2026-09-17).
+
+- The OpenAI-compatible image provider's settings offer a quality level --
+  server default, low, high -- kept per account with the provider's entry
+  (`imageProvidersConfig[id].quality`). The browser sends it as
+  `x-image-quality`, the route passes it to the adapter, and the request
+  carries OpenAI's `quality` field only when a level is set; the default
+  changes nothing (`components/settings/image-settings.tsx`,
+  `lib/media/adapters/openai-compatible-image-adapter.ts`,
+  `app/api/generate/image/route.ts`).
+- The route logs `Image took N ms: provider=… model=… size=… quality=…` for
+  every image, and `Image failed after N ms: …` when one fails, so the time
+  an image really takes on the host can be read from `docker logs`.
+
+Tests: `tests/media/openai-compatible-image-adapter.test.ts` (the field only
+when set; red before) and `tests/server/generate-image-quality.test.ts` (the
+header to the adapter, unknown values ignored, both log lines).
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

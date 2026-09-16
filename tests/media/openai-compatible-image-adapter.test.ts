@@ -156,6 +156,40 @@ describe('openai-compatible-image adapter', () => {
     expect(result).toEqual({ url: undefined, base64: 'AAAA', width: 1536, height: 1024 });
   });
 
+  it('sends a quality level only when the provider is set to one', async () => {
+    // Fork (2026-09-17): the user's image server runs low / default / high
+    // steps per OpenAI's `quality`; the request carries it only when the
+    // provider's settings name one, so an unset level changes nothing.
+    for (const quality of ['low', 'high'] as const) {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ b64_json: 'AAAA' }] }),
+      });
+      await generateWithOpenAICompatibleImage(
+        {
+          providerId: 'custom-image',
+          apiKey: '',
+          baseUrl: BASE,
+          model: 'qwen-image-2512',
+          quality,
+        },
+        { prompt: 'a diagram', width: 1024, height: 576 },
+      );
+      const [, init] = mockFetch.mock.calls.at(-1)!;
+      expect(JSON.parse(init.body)).toMatchObject({ quality });
+    }
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: 'AAAA' }] }),
+    });
+    await generateWithOpenAICompatibleImage(
+      { providerId: 'custom-image', apiKey: '', baseUrl: BASE, model: 'qwen-image-2512' },
+      { prompt: 'a diagram', width: 1024, height: 576 },
+    );
+    const [, unset] = mockFetch.mock.calls.at(-1)!;
+    expect(JSON.parse(unset.body)).not.toHaveProperty('quality');
+  });
+
   it('is reachable through the provider dispatch for both probe and generation', async () => {
     mockFetch.mockResolvedValueOnce(list(['m']));
     await expect(
