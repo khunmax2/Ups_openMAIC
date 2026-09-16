@@ -187,4 +187,46 @@ describe('organisation model catalog routes', () => {
       "Removed the organisation's openrouter models: by user:boss",
     ]);
   });
+
+  it("clears the organisation's default when its model leaves the provider's list", async () => {
+    const { handleOrgWrite, handleList } = await arm();
+    const admin = as('user:boss', 'admin');
+    const defaultOf = async () =>
+      (
+        await (
+          await handleList(new Request('http://s/api/studio/credentials', { headers: admin }))
+        ).json()
+      ).org.defaultModel;
+    const setDefault = (modelId: string) =>
+      put(handleOrgWrite, admin, ['llm-default'], { providerId: 'openrouter', modelId });
+    const setModels = (body: unknown) =>
+      put(handleOrgWrite, admin, ['llm-models', 'openrouter'], body);
+
+    // An organisation addition that is then dropped.
+    await setModels(models);
+    await setDefault('google/gemini-3.5-flash-lite');
+    await setModels({ hidden: [], extra: [] });
+    expect(await defaultOf()).toBeUndefined();
+
+    // A built-in that is then hidden.
+    await setDefault('deepseek/deepseek-v4-pro');
+    await setModels({ hidden: ['deepseek/deepseek-v4-flash'], extra: [] });
+    expect(await defaultOf()).toMatchObject({ modelId: 'deepseek/deepseek-v4-pro' });
+    await setModels({ hidden: ['deepseek/deepseek-v4-pro'], extra: [] });
+    expect(await defaultOf()).toBeUndefined();
+
+    // The provider's list removed altogether; another provider's default is untouched.
+    await setModels(models);
+    await setDefault('google/gemini-3.5-flash-lite');
+    await put(handleOrgWrite, admin, ['llm-models', 'google'], { hidden: [], extra: [] });
+    expect(await defaultOf()).toMatchObject({ modelId: 'google/gemini-3.5-flash-lite' });
+    await handleOrgWrite(new Request('http://s/x', { method: 'DELETE', headers: admin }), [
+      'llm-models',
+      'openrouter',
+    ]);
+    expect(await defaultOf()).toBeUndefined();
+    expect(logged.info.filter((l) => l.includes('default model'))).toContainEqual(
+      "Cleared the organisation's default model: openrouter/google/gemini-3.5-flash-lite left the openrouter models",
+    );
+  });
 });
