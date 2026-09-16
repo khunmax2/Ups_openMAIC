@@ -5,15 +5,22 @@
  *
  * Two storages, one field. Behind the gateway the server holds the key and
  * the store holds the sentinel `***` (lib/credentials/client.ts); the field
- * shows the mask the server sent and, for an admin, can promote the key to
- * the shared default. Without a server store the key is in the browser's own
- * storage, and the field masks it the same way. Either way the eye reveals
- * only text typed in this session, which the person at the keyboard already
- * knows.
+ * shows the mask the server sent. Without a server store the key is in the
+ * browser's own storage, and the field masks it the same way. Either way the
+ * eye reveals only text typed in this session, which the person at the
+ * keyboard already knows.
+ *
+ * For an admin the field also carries the one organisation action a provider
+ * has (decided 2026-09-17): "use this for every account" shares the key --
+ * with the provider's definition when it is a custom one -- and, for a
+ * built-in LLM provider, publishes the organisation's model list in the same
+ * click (`organisation` prop). Updating and withdrawing are the same two
+ * things done again or undone; removing the key withdraws everything the
+ * server published with it (lib/server/credentials/routes.ts).
  */
 
 import { useState } from 'react';
-import { Check, ChevronDown, Eye, EyeOff, Trash2, Users } from 'lucide-react';
+import { Building2, Eye, EyeOff, Star, Trash2, Users } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -26,14 +33,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   CREDENTIAL_SENTINEL,
@@ -66,6 +65,18 @@ interface ApiKeyFieldProps {
   className?: string;
   /** Which server-side credential this field edits, when the server holds keys. */
   credential?: { section: CredentialSection; providerId: string };
+  /**
+   * Fork. What a built-in LLM provider publishes together with the key: its
+   * organisation model list. `published` says the list is out, `publish`
+   * sends it (after the key is shared), `confirm` is asked before the first
+   * publish, `hint` shows under a published list.
+   */
+  organisation?: {
+    published: boolean;
+    publish: () => Promise<boolean>;
+    confirm: { title: string; body: string };
+    hint?: string;
+  };
 }
 
 export function ApiKeyField({
@@ -77,6 +88,7 @@ export function ApiKeyField({
   onBlur,
   className,
   credential,
+  organisation,
 }: ApiKeyFieldProps) {
   const { t, locale } = useI18n();
   const [show, setShow] = useState(false);
@@ -87,7 +99,9 @@ export function ApiKeyField({
   const [previous, setPrevious] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Fork: which change to the shared key is waiting on the admin's yes.
-  const [confirming, setConfirming] = useState<'replace' | 'stop' | null>(null);
+  const [confirming, setConfirming] = useState<'publish' | 'replace' | 'stop' | 'remove' | null>(
+    null,
+  );
   // The pages swap providers without remounting their inputs. Reset when the
   // field's identity changes, or a key typed for provider A would leave
   // provider B's stored key revealable.
@@ -135,21 +149,32 @@ export function ApiKeyField({
   };
   const removeOwn = () =>
     withBusy(() => removeCredential(credential!.section, credential!.providerId));
-  const stopSharing = () =>
+  // The server withdraws the provider's organisation list and default with the
+  // shared key (lib/server/credentials/routes.ts).
+  const withdraw = () =>
     withBusy(() => removeCredential(credential!.section, credential!.providerId, 'default'));
-  // The provider's definition goes with the key, so an account whose browser
-  // never added the provider can still see and use it (lib/credentials/client.ts).
-  const share = () =>
+  // Share the key -- the provider's definition goes with it, so an account
+  // whose browser never added the provider can still see and use it
+  // (lib/credentials/client.ts) -- then publish what else the provider has.
+  const publish = () =>
     withBusy(async () => {
       const stored = await shareCredential(credential!.section, credential!.providerId);
-      return stored !== undefined;
+      if (stored === undefined) return false;
+      return organisation ? organisation.publish() : true;
     });
 
   if (stored) {
     const masked = value === CREDENTIAL_SENTINEL && meta ? meta.masked : maskApiKey(value);
     const fromDefault = value === CREDENTIAL_SENTINEL && meta?.source === 'default';
     const own = value === CREDENTIAL_SENTINEL && meta?.source === 'own';
-    const shared = fromDefault || isShared;
+    const curates = !!credential && role === 'admin' && serverBacked;
+    // Published: the shared key is out (mine or another admin's), or the list is.
+    const published = !!defaultRow || !!organisation?.published;
+    const startPublish = () => {
+      if (effect === 'replace') setConfirming('replace');
+      else if (organisation && !published) setConfirming('publish');
+      else void publish();
+    };
     return (
       <div className={cn('flex flex-col gap-1', className)}>
         <div className="flex flex-wrap gap-2">
@@ -175,7 +200,7 @@ export function ApiKeyField({
           >
             {t('settings.apiKeyChange')}
           </Button>
-          {own && credential && role !== 'admin' && (
+          {own && credential && (
             <Button
               type="button"
               variant="ghost"
@@ -183,94 +208,10 @@ export function ApiKeyField({
               disabled={disabled || busy}
               aria-label={t('settings.apiKeyRemove')}
               title={t('settings.apiKeyRemove')}
-              onClick={() => void removeOwn()}
+              onClick={() => (isShared ? setConfirming('remove') : void removeOwn())}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
-          )}
-          {(own || fromDefault) && credential && role === 'admin' && serverBacked && (
-            // The admin's actions on this provider's key -- share their own
-            // with every account, stop sharing, remove their own -- in one
-            // menu on the key's row. Sharing is the one admin-only action in
-            // the studio, so its state is also shown without opening the
-            // menu. An admin who removed their own key while it was shared
-            // still sees the shared one here, and keeps the way to stop it.
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant={isShared ? 'secondary' : 'outline'}
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={disabled || busy}
-                  aria-label={t('settings.apiKeyActions')}
-                >
-                  <Users className={cn('h-3.5 w-3.5', shared && 'text-primary')} />
-                  {shared ? t('settings.apiKeySharedShort') : null}
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[260px]">
-                {shared ? (
-                  <>
-                    <DropdownMenuLabel className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                      {t('settings.apiKeyIsShared')}
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem className="gap-2" onClick={() => setConfirming('stop')}>
-                      <Users className="h-3.5 w-3.5" />
-                      <span className="flex flex-col">
-                        <span>{t('settings.apiKeyStopSharing')}</span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {t('settings.apiKeyStopSharingHint')}
-                        </span>
-                      </span>
-                    </DropdownMenuItem>
-                  </>
-                ) : (
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={() => {
-                      if (effect === 'replace') setConfirming('replace');
-                      else void share();
-                    }}
-                  >
-                    <Users className="h-3.5 w-3.5" />
-                    <span className="flex flex-col">
-                      <span>
-                        {effect === 'replace'
-                          ? t('settings.apiKeyShareReplace')
-                          : t('settings.apiKeyShare')}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {effect === 'replace'
-                          ? t('settings.apiKeyShareReplaceHint')
-                          : t('settings.apiKeyShareHint')}
-                      </span>
-                    </span>
-                  </DropdownMenuItem>
-                )}
-                {own && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="gap-2 text-destructive focus:text-destructive"
-                      onClick={() => void removeOwn()}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span className="flex flex-col">
-                        <span>{t('settings.apiKeyRemove')}</span>
-                        {isShared && (
-                          <span className="text-[11px] font-normal text-muted-foreground">
-                            {t('settings.apiKeyRemoveKeepsShared')}
-                          </span>
-                        )}
-                      </span>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           )}
         </div>
         {serverBacked && fromDefault && (
@@ -281,10 +222,63 @@ export function ApiKeyField({
             </span>
           </div>
         )}
-        {serverBacked && role === 'admin' && sharer && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Users className="h-3.5 w-3.5" />
-            <span>{sharer}</span>
+        {curates && (
+          // Fork: the provider's one organisation action, on the key's row.
+          <div className="mt-1 rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-sm font-medium">
+                <Building2 className="h-4 w-4 text-primary" />
+                {published ? t('settings.orgSetupTitle') : t('settings.orgSetupPublishHint')}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {published ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={disabled || busy || !own}
+                      title={own ? undefined : t('settings.orgSetupNeedsKey')}
+                      onClick={startPublish}
+                    >
+                      {t('settings.orgSetupUpdate')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      disabled={disabled || busy}
+                      onClick={() => setConfirming('stop')}
+                    >
+                      {t('settings.orgSetupWithdraw')}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={disabled || busy || !own}
+                    title={own ? undefined : t('settings.orgSetupNeedsKey')}
+                    onClick={startPublish}
+                  >
+                    {t('settings.orgSetupPublish')}
+                  </Button>
+                )}
+              </div>
+            </div>
+            {sharer && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                <span>{sharer}</span>
+              </div>
+            )}
+            {organisation?.published && organisation.hint && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Star className="h-3 w-3" />
+                {organisation.hint}
+              </div>
+            )}
           </div>
         )}
         <AlertDialog
@@ -298,30 +292,54 @@ export function ApiKeyField({
               <AlertDialogTitle>
                 {confirming === 'stop'
                   ? t('settings.apiKeyStopTitle')
-                  : t('settings.apiKeyReplaceTitle')}
+                  : confirming === 'remove'
+                    ? t('settings.apiKeyRemoveSharedTitle')
+                    : confirming === 'publish' && organisation
+                      ? organisation.confirm.title
+                      : t('settings.apiKeyReplaceTitle')}
               </AlertDialogTitle>
               <AlertDialogDescription className="flex flex-col gap-2">
-                {sharer && <span>{sharer}</span>}
+                {sharer && confirming !== 'publish' && <span>{sharer}</span>}
                 <span>
                   {confirming === 'stop'
                     ? t('settings.apiKeyStopBody')
-                    : t('settings.apiKeyReplaceBody')}
+                    : confirming === 'remove'
+                      ? t('settings.apiKeyRemoveSharedBody')
+                      : confirming === 'publish' && organisation
+                        ? organisation.confirm.body
+                        : t('settings.apiKeyReplaceBody')}
                 </span>
+                {organisation && (confirming === 'stop' || confirming === 'remove') && (
+                  <span>{t('settings.orgSetupWithdrawAlso')}</span>
+                )}
+                {organisation && confirming === 'replace' && (
+                  <span>{organisation.confirm.body}</span>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction
-                variant={confirming === 'stop' ? 'destructive' : 'default'}
+                variant={
+                  confirming === 'stop' || confirming === 'remove' ? 'destructive' : 'default'
+                }
                 onClick={() => {
                   const action = confirming;
                   setConfirming(null);
-                  void (action === 'stop' ? stopSharing() : share());
+                  void (action === 'stop'
+                    ? withdraw()
+                    : action === 'remove'
+                      ? removeOwn()
+                      : publish());
                 }}
               >
                 {confirming === 'stop'
                   ? t('settings.apiKeyStopConfirm')
-                  : t('settings.apiKeyReplaceConfirm')}
+                  : confirming === 'remove'
+                    ? t('settings.apiKeyRemove')
+                    : confirming === 'replace'
+                      ? t('settings.apiKeyReplaceConfirm')
+                      : t('common.confirm')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

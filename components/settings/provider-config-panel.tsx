@@ -79,7 +79,7 @@ export function ProviderConfigPanel({
   onResetToDefault,
   isBuiltIn,
 }: ProviderConfigPanelProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
 
   // Local state for this provider
   const [apiKey, setApiKey] = useState(initialApiKey);
@@ -225,11 +225,7 @@ export function ProviderConfigPanel({
   const canCurate =
     serverBacked && role === 'admin' && isBuiltIn && !modelsLocked && registry.length > 0;
   const [orgConfirm, setOrgConfirm] = useState<
-    | { kind: 'publish' }
-    | { kind: 'remove' }
-    | { kind: 'drop'; modelId: string }
-    | { kind: 'default'; modelId: string }
-    | null
+    { kind: 'drop'; modelId: string } | { kind: 'default'; modelId: string } | null
   >(null);
   const [orgBusy, setOrgBusy] = useState(false);
 
@@ -244,6 +240,7 @@ export function ProviderConfigPanel({
           : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
       });
       if (res.ok) await refreshCredentials();
+      return res.ok;
     } finally {
       setOrgBusy(false);
     }
@@ -262,17 +259,6 @@ export function ProviderConfigPanel({
   };
   const setOrgDefault = (modelId: string) =>
     orgRequest('PUT', 'llm-default', { providerId: provider.id, modelId });
-  const orgStamp = (() => {
-    if (!orgHere?.updatedAt) return '';
-    const time = new Date(orgHere.updatedAt).toLocaleString(locale, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
-    if (orgHere.updatedByYou) return t('settings.orgModelsByYou', { time });
-    return orgHere.updatedBy
-      ? t('settings.orgModelsByOther', { who: orgHere.updatedBy, time })
-      : '';
-  })();
 
   // An admin's delete of the organisation's entry edits the organisation's list
   // (after a question); anything else is this person's own list.
@@ -288,11 +274,7 @@ export function ProviderConfigPanel({
     const pending = orgConfirm;
     setOrgConfirm(null);
     if (!pending) return;
-    if (pending.kind === 'publish') {
-      void orgRequest('PUT', `llm-models/${provider.id}`, catalogFromList(registry, models));
-    } else if (pending.kind === 'remove') {
-      void orgRequest('DELETE', `llm-models/${provider.id}`);
-    } else if (pending.kind === 'default') {
+    if (pending.kind === 'default') {
       void setOrgDefault(pending.modelId);
     } else if (orgHere) {
       void (builtInIds.has(pending.modelId)
@@ -323,6 +305,24 @@ export function ProviderConfigPanel({
             <div className="flex gap-2">
               <ApiKeyField
                 credential={{ section: 'providers', providerId: provider.id }}
+                organisation={
+                  canCurate
+                    ? {
+                        published: !!orgHere,
+                        publish: () =>
+                          orgRequest(
+                            'PUT',
+                            `llm-models/${provider.id}`,
+                            catalogFromList(registry, models),
+                          ),
+                        confirm: {
+                          title: t('settings.orgModelsPublishTitle'),
+                          body: t('settings.orgModelsPublishBody'),
+                        },
+                        hint: orgHere ? t('settings.orgDefaultHint') : undefined,
+                      }
+                    : undefined
+                }
                 name={`llm-api-key-${provider.id}`}
                 placeholder="sk-..."
                 value={apiKey}
@@ -527,55 +527,6 @@ export function ProviderConfigPanel({
           </div>
         )}
 
-        {/* Fork: the organisation's model list (lib/credentials/org-models.ts). */}
-        {canCurate && (
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 text-sm font-medium">
-                <Building2 className="h-4 w-4 text-primary" />
-                {orgHere ? t('settings.orgModelsTitle') : t('settings.orgModelsPublishHint')}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {orgHere ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={orgBusy}
-                      onClick={() => setOrgConfirm({ kind: 'publish' })}
-                    >
-                      {t('settings.orgModelsUpdate')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive"
-                      disabled={orgBusy}
-                      onClick={() => setOrgConfirm({ kind: 'remove' })}
-                    >
-                      {t('settings.orgModelsRemove')}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    size="sm"
-                    disabled={orgBusy}
-                    onClick={() => setOrgConfirm({ kind: 'publish' })}
-                  >
-                    {t('settings.orgModelsPublish')}
-                  </Button>
-                )}
-              </div>
-            </div>
-            {orgStamp && <div className="text-xs text-muted-foreground">{orgStamp}</div>}
-            {orgHere && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Star className="h-3 w-3" />
-                {t('settings.orgDefaultHint')}
-              </div>
-            )}
-          </div>
-        )}
         {!canCurate && orgHere && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Building2 className="h-3.5 w-3.5" />
@@ -744,35 +695,25 @@ export function ProviderConfigPanel({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {orgConfirm?.kind === 'remove'
-                ? t('settings.orgModelsRemoveTitle')
-                : orgConfirm?.kind === 'drop'
-                  ? t('settings.orgModelDeleteTitle')
-                  : orgConfirm?.kind === 'default'
-                    ? t('settings.orgDefaultReplaceTitle')
-                    : t('settings.orgModelsPublishTitle')}
+              {orgConfirm?.kind === 'drop'
+                ? t('settings.orgModelDeleteTitle')
+                : t('settings.orgDefaultReplaceTitle')}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {orgConfirm?.kind === 'remove'
-                ? t('settings.orgModelsRemoveBody')
-                : orgConfirm?.kind === 'drop'
-                  ? t('settings.orgModelDeleteBody')
-                  : orgConfirm?.kind === 'default' && orgDefault
-                    ? t('settings.orgDefaultReplaceBody', {
-                        current: modelLabel(orgDefault.providerId, orgDefault.modelId),
-                        next: modelLabel(provider.id, orgConfirm.modelId),
-                      })
-                    : t('settings.orgModelsPublishBody')}
+              {orgConfirm?.kind === 'drop'
+                ? t('settings.orgModelDeleteBody')
+                : orgConfirm?.kind === 'default' && orgDefault
+                  ? t('settings.orgDefaultReplaceBody', {
+                      current: modelLabel(orgDefault.providerId, orgDefault.modelId),
+                      next: modelLabel(provider.id, orgConfirm.modelId),
+                    })
+                  : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
-              variant={
-                orgConfirm?.kind === 'publish' || orgConfirm?.kind === 'default'
-                  ? 'default'
-                  : 'destructive'
-              }
+              variant={orgConfirm?.kind === 'default' ? 'default' : 'destructive'}
               onClick={confirmOrg}
             >
               {t('common.confirm')}

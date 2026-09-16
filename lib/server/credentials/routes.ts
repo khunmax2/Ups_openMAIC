@@ -14,7 +14,7 @@
 
 import { createLogger } from '@/lib/logger';
 import { orgForViewer } from '@/lib/server/org/answer';
-import { readOrgCatalog } from '@/lib/server/org/store';
+import { readOrgCatalog, withdrawProviderCatalog } from '@/lib/server/org/store';
 import { readVerifiedOrAnonymousOwnerId } from '@/lib/server/agent-runtime/owner';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import {
@@ -42,6 +42,7 @@ const PROVIDER_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_FIELD = 4096;
 
 const log = createLogger('Credentials');
+const orgLog = createLogger('OrgCatalog');
 
 function json(status: number, body: unknown): Response {
   return Response.json(body, { status });
@@ -250,6 +251,34 @@ export async function handleWrite(request: Request, segments: string[]): Promise
     invalidateCredentialCache(shared ? undefined : owner);
     if (shared && removed) {
       log.info(`Stopped sharing ${target}: by ${owner}; it was shared by ${sharedBy(previous)}`);
+    }
+    // Fork (2026-09-17). One button publishes an admin's key and, for a
+    // built-in LLM provider, the organisation's model list. Removing that key
+    // -- the shared row itself, or the admin's own row it was copied from --
+    // withdraws all of it, so nothing stays half published.
+    let sharedKeyGone = shared && removed;
+    if (!shared && removed) {
+      const defaultRow = await readCredential(store, {
+        ...address,
+        scope: 'default',
+        ownerId: owner,
+      });
+      if (defaultRow && defaultRow.updatedBy === owner) {
+        await deleteCredential(store, { ...address, scope: 'default', ownerId: owner });
+        invalidateCredentialCache();
+        log.info(`Stopped sharing ${target}: by ${owner}; they removed the key it was copied from`);
+        sharedKeyGone = true;
+      }
+    }
+    if (sharedKeyGone && address.section === 'providers') {
+      const gone = await withdrawProviderCatalog(store, address.providerId);
+      if (gone.models || gone.defaultModel) {
+        orgLog.info(
+          `Withdrew the organisation's ${address.providerId} models${
+            gone.defaultModel ? ' and its default model' : ''
+          }: the shared key was removed`,
+        );
+      }
     }
     return json(200, { removed });
   }
