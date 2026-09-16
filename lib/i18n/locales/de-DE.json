@@ -2029,6 +2029,8 @@
     "videoCapability": "Videogenerierung",
     "videoHint": "Videos für Folien generieren",
     "ttsCapability": "Text-to-Speech",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "KI-Lehrkraft liest Inhalte vor",
     "asrCapability": "Spracherkennung",
     "asrHint": "Spracheingabe für Diskussionsrunden",

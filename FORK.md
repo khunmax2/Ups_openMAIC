@@ -750,6 +750,18 @@ Tests: `tests/server/org-catalog.test.ts` ("withdrawing the shared key":
 the shared row removed, the sharer's own row removed, another admin's own row
 removed -- red before the change) and `tests/credentials/share-audit.test.ts`
 (the keys the row uses).
+### The home page's media popover names the TTS provider, model and voice
+
+The popover that toggles image, video, speech and recognition on the home
+page let the image and video tabs pick a provider and model and the
+recognition tab a provider and language, while the speech tab had only its
+switch. The user asked for the same picture on speech (2026-09-17). The tab
+now lists every usable TTS provider with its models (custom providers with
+the models they define) and shows the voice in use under it
+(`components/generation/media-popover.tsx`, `media.ttsVoice` in 13 locales).
+Picking a model sets the provider and its model the way the settings dialog
+does, so the voice rules from "a custom TTS provider is only sent a voice it
+lists" still apply.
 
 ## Rebasing onto a new upstream
 

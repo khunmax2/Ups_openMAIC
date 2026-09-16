@@ -2029,6 +2029,8 @@
     "videoCapability": "视频生成",
     "videoHint": "课件中生成视频",
     "ttsCapability": "语音合成",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "AI 老师语音讲解",
     "asrCapability": "语音识别",
     "asrHint": "语音输入参与讨论",

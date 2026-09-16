@@ -2029,6 +2029,8 @@
     "videoCapability": "Geração de Vídeos",
     "videoHint": "Gerar vídeos nos slides",
     "ttsCapability": "Texto para Fala",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "O professor de IA fala em voz alta",
     "asrCapability": "Reconhecimento de Fala",
     "asrHint": "Entrada por voz nas discussões",

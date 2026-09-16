@@ -2029,6 +2029,8 @@
     "videoCapability": "Video Generation",
     "videoHint": "Generate videos in slides",
     "ttsCapability": "Text-to-Speech",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "AI teacher speaks aloud",
     "asrCapability": "Speech Recognition",
     "asrHint": "Voice input for discussion",

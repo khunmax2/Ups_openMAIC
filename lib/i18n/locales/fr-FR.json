@@ -2029,6 +2029,8 @@
     "videoCapability": "Génération de vidéos",
     "videoHint": "Générer des vidéos dans les diapositives",
     "ttsCapability": "Synthèse vocale",
+    "ttsVoice": "Voice: {{voice}}",
+    "ttsDefaultModel": "Default model",
     "ttsHint": "Le professeur IA parle à voix haute",
     "asrCapability": "Reconnaissance vocale",
     "asrHint": "Saisie vocale pour la discussion",
