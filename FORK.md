@@ -695,8 +695,16 @@ keeps them and every account applies them.
   carries a badge and is edited by nobody in place; other accounts get no
   delete on it (`components/settings/provider-config-panel.tsx`, 19
   `settings.org*` keys in all 13 locales).
+- The star that makes a model the organisation's default appears only once
+  the provider has a published list, on the rows that list holds -- the
+  registry's built-ins and the organisation's additions -- and the bar then
+  says so (`offersOrgDefault`, `settings.orgDefaultHint`). The first cut
+  starred built-ins before anything was published and nothing else, which
+  read as a bug on the host (2026-09-16): the model the admin had just added
+  had no star, and nothing said that publishing the list was the step that
+  gives it one.
 
-Tests: `tests/credentials/org-models.test.ts` (the list and default rules),
+Tests: `tests/credentials/org-models.test.ts` (the list, default and star rules),
 `tests/server/org-catalog.test.ts` (admin-only writes, what is kept, who is
 told what, the log), `tests/store/org-model-catalog-store.test.ts` (the real
 store: a new account and a reload, a model the person picked, and a tab

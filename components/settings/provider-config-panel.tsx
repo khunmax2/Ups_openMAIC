@@ -41,7 +41,7 @@ import { createVerifyModelRequest, formatContextWindow } from './utils';
 import { cn } from '@/lib/utils';
 import { apiPath } from '@/lib/base-path';
 import { refreshCredentials } from '@/lib/credentials/client';
-import { catalogFromList } from '@/lib/credentials/org-models';
+import { catalogFromList, offersOrgDefault } from '@/lib/credentials/org-models';
 import { useSettingsStore } from '@/lib/store/settings';
 
 interface ProviderConfigPanelProps {
@@ -552,6 +552,12 @@ export function ProviderConfigPanel({
               </div>
             </div>
             {orgStamp && <div className="text-xs text-muted-foreground">{orgStamp}</div>}
+            {orgHere && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Star className="h-3 w-3" />
+                {t('settings.orgDefaultHint')}
+              </div>
+            )}
             {orgHere && orgHere.hidden.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <span>{t('settings.orgModelsHidden')}</span>
@@ -653,8 +659,12 @@ export function ProviderConfigPanel({
                 {!modelsLocked && (!model.fromOrg || canCurate) && (
                   <div className="flex items-center gap-1">
                     {canCurate &&
-                      (builtInIds.has(model.id) || model.fromOrg) &&
-                      !isOrgDefault(model.id) && (
+                      offersOrgDefault(model, {
+                        published: !!orgHere,
+                        builtInIds,
+                        defaultModelId:
+                          orgDefault?.providerId === provider.id ? orgDefault.modelId : undefined,
+                      }) && (
                         <Button
                           variant="ghost"
                           size="sm"

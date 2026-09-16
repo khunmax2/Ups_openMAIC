@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   catalogFromList,
   newerCatalog,
+  offersOrgDefault,
   orgDefaultFor,
   personalBuiltIns,
   withOrgModels,
@@ -155,5 +156,26 @@ describe('catalogFromList', () => {
         { id: gemini.id, name: gemini.name, contextWindow: 100, capabilities: { tools: true } },
       ],
     });
+  });
+});
+
+describe('offersOrgDefault', () => {
+  const ctx = { published: true, builtInIds: new Set(['ds/pro']) };
+
+  it('offers no star until the organisation has a list for the provider', () => {
+    expect(offersOrgDefault({ id: 'ds/pro' }, { ...ctx, published: false })).toBe(false);
+    expect(offersOrgDefault({ id: gemini.id, fromOrg: true }, { ...ctx, published: false })).toBe(
+      false,
+    );
+  });
+
+  it("offers the star on the organisation's rows, not on a person's own addition", () => {
+    expect(offersOrgDefault({ id: 'ds/pro' }, ctx)).toBe(true);
+    expect(offersOrgDefault({ id: gemini.id, fromOrg: true }, ctx)).toBe(true);
+    expect(offersOrgDefault({ id: 'mine' }, ctx)).toBe(false);
+  });
+
+  it('leaves the current default without a star', () => {
+    expect(offersOrgDefault({ id: 'ds/pro' }, { ...ctx, defaultModelId: 'ds/pro' })).toBe(false);
   });
 });
