@@ -787,6 +787,47 @@ Tests: `tests/media/openai-compatible-image-adapter.test.ts` (the field only
 when set; red before) and `tests/server/generate-image-quality.test.ts` (the
 header to the adapter, unknown values ignored, both log lines).
 
+### The primary administrator can purge an account's data
+
+DeepWitya's admin design (Phase 2, 2026-09-18) deletes an account in two
+steps: a bin with a 30-day restore, then a purge that removes what the
+account owned on both sides. The studio's half is this. Nothing in it runs
+until DeepWitya calls it; without the new header, every call is a 403.
+
+- **A third gateway header.** `x-deeptutor-primary: 1` marks the deployment's
+  primary administrator, the one account that may purge. `role` cannot say
+  this -- every admin is `admin` -- so `readStudioPrimary()` in
+  `lib/server/studio-identity.ts` reads it, true only beside `admin`, renamed
+  with `STUDIO_PRIMARY_HEADER` like the other two.
+- **`lib/server/accounts/purge.ts`** (new) names every table with an owner
+  column and removes the account's rows in one transaction: courses and
+  their cascades, agent sessions and their events, owner session events and
+  counters, skills, folders, materials, asset entries (the account's; a blob
+  nothing references any more is marked unreferenced for the storage
+  package's collector), account KV and the account's own credentials.
+  - **A published course stays**, re-owned to `deleted:<uid>`, because the
+    learners using it did not lose their author (Moodle keeps forum posts,
+    GitHub re-attributes to `ghost`). Drafts and soft-deleted courses go, with
+    their `data/classrooms/<stage>/` media.
+  - **A shared key and the organisation's list stay**; they belong to the
+    deployment. Their `updated_by` becomes the tombstone, so the page can say
+    the sharer is an account that no longer exists.
+- **`lib/server/accounts/routes.ts`** (new), at `/api/studio/admin/accounts`:
+  `GET` lists the `user:` ids with rows here (DeepWitya shows the ones with
+  no account as leftovers), `GET /{ownerId}/footprint` counts without
+  deleting, `DELETE /{ownerId}` purges rows, then media directories and
+  material bytes. Idempotent: an id with nothing left answers 200 with
+  zeros, which is how ids stranded by an older delete are cleaned up. An
+  account cannot purge itself. Every purge and every refusal is logged at
+  WARN as `[Accounts]`.
+
+Tests: `tests/server/accounts-purge.test.ts` builds the real schemas on
+PGlite and checks that nothing owned by the purged id remains, that the
+other account is untouched, the published course and the shared rows
+survive re-attributed, only the orphaned blob is marked, and a second purge
+is empty; `tests/server/accounts-routes.test.ts` covers the 403s, the
+malformed ids, the self-purge and the files on disk.
+
 ## Rebasing onto a new upstream
 
 Rebase for a reason — a security fix, a wanted feature — never on a schedule,

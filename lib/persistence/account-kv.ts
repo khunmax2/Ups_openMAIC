@@ -75,7 +75,7 @@ class KvHttpError extends Error {
 
 const schemaReady = new WeakMap<Queryable, Promise<void>>();
 
-function ensureAccountKvSchema(queryable: Queryable): Promise<void> {
+export function ensureAccountKvSchema(queryable: Queryable): Promise<void> {
   let ready = schemaReady.get(queryable);
   if (!ready) {
     ready = (async () => {
