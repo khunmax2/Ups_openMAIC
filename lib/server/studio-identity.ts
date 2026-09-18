@@ -63,6 +63,24 @@ export function readStudioRole(headers: Headers): StudioRole {
   return headers.get(roleHeaderName())?.trim() === 'admin' ? 'admin' : 'user';
 }
 
+const DEFAULT_PRIMARY_HEADER = 'x-deeptutor-primary';
+
+/**
+ * The third header, set only for DeepWitya's primary administrator: the one
+ * account that owns the deployment and the only one allowed to purge another
+ * account's data here (design decisions 4–6, 2026-09-15). `role` cannot say
+ * this -- every admin is `admin` -- so it is its own header, and it counts
+ * only beside `admin`: a gateway that marked a non-admin primary would be
+ * misconfigured, and the safe reading of a contradiction is "not primary".
+ */
+export function primaryHeaderName(): string {
+  return (process.env.STUDIO_PRIMARY_HEADER || DEFAULT_PRIMARY_HEADER).toLowerCase();
+}
+
+export function readStudioPrimary(headers: Headers): boolean {
+  return readStudioRole(headers) === 'admin' && headers.get(primaryHeaderName())?.trim() === '1';
+}
+
 /**
  * DeepWitya's own bound on the value it puts after the prefix
  * (`AuthStatusResponse.user_id`, `min_length=1, max_length=64`). Matching it
